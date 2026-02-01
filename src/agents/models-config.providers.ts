@@ -76,6 +76,17 @@ const OLLAMA_DEFAULT_COST = {
   cacheWrite: 0,
 };
 
+const BYTEDANCE_DEFAULT_BASE_URL = "http://dev1.bytedance.net:8000";
+const BYTEDANCE_DEFAULT_API_VERSION = "2024-02-01";
+const BYTEDANCE_DEFAULT_CONTEXT_WINDOW = 128000;
+const BYTEDANCE_DEFAULT_MAX_TOKENS = 8192;
+const BYTEDANCE_DEFAULT_COST = {
+  input: 0,
+  output: 0,
+  cacheRead: 0,
+  cacheWrite: 0,
+};
+
 interface OllamaModel {
   name: string;
   modified_at: string;
@@ -376,6 +387,79 @@ export function buildXiaomiProvider(): ProviderConfig {
   };
 }
 
+type BytedanceModelEntry = {
+  id?: unknown;
+  name?: unknown;
+};
+
+type BytedanceModelsResponse = {
+  data?: unknown;
+  models?: unknown;
+};
+
+async function discoverBytedanceModels(params: {
+  baseUrl: string;
+  headers: Record<string, string>;
+}): Promise<ModelDefinitionConfig[]> {
+  if (process.env.VITEST || process.env.NODE_ENV === "test") {
+    return [];
+  }
+
+  const baseUrl = params.baseUrl.trim().replace(/\/+$/g, "");
+  if (!baseUrl) {
+    return [];
+  }
+
+  try {
+    const response = await fetch(`${baseUrl}/models`, {
+      signal: AbortSignal.timeout(5000),
+      headers: params.headers,
+    });
+    if (!response.ok) {
+      console.warn(`[bytedance-models] Failed to discover models: HTTP ${response.status}`);
+      return [];
+    }
+    const data = (await response.json()) as BytedanceModelsResponse;
+
+    const rawList = Array.isArray(data.data)
+      ? data.data
+      : Array.isArray(data.models)
+        ? data.models
+        : [];
+    if (rawList.length === 0) {
+      console.warn("[bytedance-models] No models found from API");
+      return [];
+    }
+
+    const models: ModelDefinitionConfig[] = [];
+    for (const entry of rawList) {
+      const obj = entry as BytedanceModelEntry;
+      const id = typeof obj.id === "string" ? obj.id.trim() : "";
+      if (!id) {
+        continue;
+      }
+      const name =
+        typeof obj.name === "string" && obj.name.trim() && obj.name !== obj.id
+          ? obj.name.trim()
+          : id;
+      models.push({
+        id,
+        name,
+        reasoning: false,
+        input: ["text"],
+        cost: BYTEDANCE_DEFAULT_COST,
+        contextWindow: BYTEDANCE_DEFAULT_CONTEXT_WINDOW,
+        maxTokens: BYTEDANCE_DEFAULT_MAX_TOKENS,
+      });
+    }
+
+    return models;
+  } catch (error) {
+    console.warn(`[bytedance-models] Failed to discover models: ${String(error)}`);
+    return [];
+  }
+}
+
 async function buildVeniceProvider(): Promise<ProviderConfig> {
   const models = await discoverVeniceModels();
   return {
@@ -459,6 +543,27 @@ export async function resolveImplicitProviders(params: {
     resolveApiKeyFromProfiles({ provider: "ollama", store: authStore });
   if (ollamaKey) {
     providers.ollama = { ...(await buildOllamaProvider()), apiKey: ollamaKey };
+  }
+
+  const bytedanceToken = process.env.BYTEDANCE_LLM_AUTH_TOKEN?.trim();
+  if (bytedanceToken) {
+    const baseUrl = (process.env.BYTEDANCE_LLM_BASE_URL ?? BYTEDANCE_DEFAULT_BASE_URL).trim();
+    const apiVersion = (
+      process.env.BYTEDANCE_LLM_API_VERSION ?? BYTEDANCE_DEFAULT_API_VERSION
+    ).trim();
+    const headers: Record<string, string> = { "auth-token": bytedanceToken };
+    if (apiVersion) {
+      headers["api-version"] = apiVersion;
+    }
+    const models = await discoverBytedanceModels({ baseUrl, headers });
+    providers["bytedance-dev1"] = {
+      baseUrl,
+      api: "openai-completions",
+      authHeader: false,
+      headers,
+      models,
+      apiKey: "BYTEDANCE_LLM_AUTH_TOKEN",
+    };
   }
 
   return providers;

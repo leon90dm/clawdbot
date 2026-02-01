@@ -1,0 +1,378 @@
+{
+  "agent:main:main": {
+    "sessionId": "6f62b92b-5a85-4028-a922-24fb3c17e3d4",
+    "updatedAt": 1769915862634,
+    "systemSent": true,
+    "abortedLastRun": false,
+    "chatType": "direct",
+    "deliveryContext": {
+      "channel": "webchat"
+    },
+    "lastChannel": "webchat",
+    "origin": {
+      "label": "openclaw-tui",
+      "provider": "webchat",
+      "surface": "webchat",
+      "chatType": "direct"
+    },
+    "sessionFile": "/Users/Neo/Opensource/clawdbot/.openclaw-local/agents/main/sessions/6f62b92b-5a85-4028-a922-24fb3c17e3d4.jsonl",
+    "compactionCount": 0,
+    "skillsSnapshot": {
+      "prompt": "\n\nThe following skills provide specialized instructions for specific tasks.\nUse the read tool to load a skill's file when the task matches its description.\n\n<available_skills>\n  <skill>\n    <name>bluebubbles</name>\n    <description>Build or update the BlueBubbles external channel plugin for OpenClaw (extension package, REST send/probe, webhook inbound).</description>\n    <location>/Users/Neo/Opensource/clawdbot/skills/bluebubbles/SKILL.md</location>\n  </skill>\n  <skill>\n    <name>coding-agent</name>\n    <description>Run Codex CLI, Claude Code, OpenCode, or Pi Coding Agent via background process for programmatic control.</description>\n    <location>/Users/Neo/Opensource/clawdbot/skills/coding-agent/SKILL.md</location>\n  </skill>\n  <skill>\n    <name>gemini</name>\n    <description>Gemini CLI for one-shot Q&amp;A, summaries, and generation.</description>\n    <location>/Users/Neo/Opensource/clawdbot/skills/gemini/SKILL.md</location>\n  </skill>\n  <skill>\n    <name>session-logs</name>\n    <description>Search and analyze your own session logs (older/parent conversations) using jq.</description>\n    <location>/Users/Neo/Opensource/clawdbot/skills/session-logs/SKILL.md</location>\n  </skill>\n  <skill>\n    <name>skill-creator</name>\n    <description>Create or update AgentSkills. Use when designing, structuring, or packaging skills with scripts, references, and assets.</description>\n    <location>/Users/Neo/Opensource/clawdbot/skills/skill-creator/SKILL.md</location>\n  </skill>\n  <skill>\n    <name>video-frames</name>\n    <description>Extract frames or short clips from videos using ffmpeg.</description>\n    <location>/Users/Neo/Opensource/clawdbot/skills/video-frames/SKILL.md</location>\n  </skill>\n  <skill>\n    <name>weather</name>\n    <description>Get current weather and forecasts (no API key required).</description>\n    <location>/Users/Neo/Opensource/clawdbot/skills/weather/SKILL.md</location>\n  </skill>\n</available_skills>",
+      "skills": [
+        {
+          "name": "bluebubbles"
+        },
+        {
+          "name": "coding-agent"
+        },
+        {
+          "name": "gemini"
+        },
+        {
+          "name": "session-logs"
+        },
+        {
+          "name": "skill-creator"
+        },
+        {
+          "name": "video-frames"
+        },
+        {
+          "name": "weather"
+        }
+      ],
+      "resolvedSkills": [
+        {
+          "name": "bluebubbles",
+          "description": "Build or update the BlueBubbles external channel plugin for OpenClaw (extension package, REST send/probe, webhook inbound).",
+          "filePath": "/Users/Neo/Opensource/clawdbot/skills/bluebubbles/SKILL.md",
+          "baseDir": "/Users/Neo/Opensource/clawdbot/skills/bluebubbles",
+          "source": "openclaw-bundled",
+          "disableModelInvocation": false
+        },
+        {
+          "name": "coding-agent",
+          "description": "Run Codex CLI, Claude Code, OpenCode, or Pi Coding Agent via background process for programmatic control.",
+          "filePath": "/Users/Neo/Opensource/clawdbot/skills/coding-agent/SKILL.md",
+          "baseDir": "/Users/Neo/Opensource/clawdbot/skills/coding-agent",
+          "source": "openclaw-bundled",
+          "disableModelInvocation": false
+        },
+        {
+          "name": "gemini",
+          "description": "Gemini CLI for one-shot Q&A, summaries, and generation.",
+          "filePath": "/Users/Neo/Opensource/clawdbot/skills/gemini/SKILL.md",
+          "baseDir": "/Users/Neo/Opensource/clawdbot/skills/gemini",
+          "source": "openclaw-bundled",
+          "disableModelInvocation": false
+        },
+        {
+          "name": "session-logs",
+          "description": "Search and analyze your own session logs (older/parent conversations) using jq.",
+          "filePath": "/Users/Neo/Opensource/clawdbot/skills/session-logs/SKILL.md",
+          "baseDir": "/Users/Neo/Opensource/clawdbot/skills/session-logs",
+          "source": "openclaw-bundled",
+          "disableModelInvocation": false
+        },
+        {
+          "name": "skill-creator",
+          "description": "Create or update AgentSkills. Use when designing, structuring, or packaging skills with scripts, references, and assets.",
+          "filePath": "/Users/Neo/Opensource/clawdbot/skills/skill-creator/SKILL.md",
+          "baseDir": "/Users/Neo/Opensource/clawdbot/skills/skill-creator",
+          "source": "openclaw-bundled",
+          "disableModelInvocation": false
+        },
+        {
+          "name": "video-frames",
+          "description": "Extract frames or short clips from videos using ffmpeg.",
+          "filePath": "/Users/Neo/Opensource/clawdbot/skills/video-frames/SKILL.md",
+          "baseDir": "/Users/Neo/Opensource/clawdbot/skills/video-frames",
+          "source": "openclaw-bundled",
+          "disableModelInvocation": false
+        },
+        {
+          "name": "weather",
+          "description": "Get current weather and forecasts (no API key required).",
+          "filePath": "/Users/Neo/Opensource/clawdbot/skills/weather/SKILL.md",
+          "baseDir": "/Users/Neo/Opensource/clawdbot/skills/weather",
+          "source": "openclaw-bundled",
+          "disableModelInvocation": false
+        }
+      ],
+      "version": 0
+    },
+    "modelProvider": "bytedance-dev1",
+    "model": "gpt-5.2",
+    "contextTokens": 128000,
+    "systemPromptReport": {
+      "source": "run",
+      "generatedAt": 1769915850911,
+      "sessionId": "6f62b92b-5a85-4028-a922-24fb3c17e3d4",
+      "sessionKey": "agent:main:main",
+      "provider": "bytedance-dev1",
+      "model": "gpt-5.2",
+      "workspaceDir": "/Users/Neo/.openclaw/workspace",
+      "bootstrapMaxChars": 20000,
+      "sandbox": {
+        "mode": "off",
+        "sandboxed": false
+      },
+      "systemPrompt": {
+        "chars": 20808,
+        "projectContextChars": 11264,
+        "nonProjectContextChars": 9544
+      },
+      "injectedWorkspaceFiles": [
+        {
+          "name": "AGENTS.md",
+          "path": "/Users/Neo/.openclaw/workspace/AGENTS.md",
+          "missing": false,
+          "rawChars": 7804,
+          "injectedChars": 7804,
+          "truncated": false
+        },
+        {
+          "name": "SOUL.md",
+          "path": "/Users/Neo/.openclaw/workspace/SOUL.md",
+          "missing": false,
+          "rawChars": 1664,
+          "injectedChars": 1664,
+          "truncated": false
+        },
+        {
+          "name": "TOOLS.md",
+          "path": "/Users/Neo/.openclaw/workspace/TOOLS.md",
+          "missing": false,
+          "rawChars": 850,
+          "injectedChars": 850,
+          "truncated": false
+        },
+        {
+          "name": "IDENTITY.md",
+          "path": "/Users/Neo/.openclaw/workspace/IDENTITY.md",
+          "missing": false,
+          "rawChars": 207,
+          "injectedChars": 207,
+          "truncated": false
+        },
+        {
+          "name": "USER.md",
+          "path": "/Users/Neo/.openclaw/workspace/USER.md",
+          "missing": false,
+          "rawChars": 182,
+          "injectedChars": 182,
+          "truncated": false
+        },
+        {
+          "name": "HEARTBEAT.md",
+          "path": "/Users/Neo/.openclaw/workspace/HEARTBEAT.md",
+          "missing": false,
+          "rawChars": 167,
+          "injectedChars": 167,
+          "truncated": false
+        },
+        {
+          "name": "BOOTSTRAP.md",
+          "path": "/Users/Neo/.openclaw/workspace/BOOTSTRAP.md",
+          "missing": true,
+          "rawChars": 0,
+          "injectedChars": 66,
+          "truncated": false
+        }
+      ],
+      "skills": {
+        "promptChars": 1944,
+        "entries": [
+          {
+            "name": "bluebubbles",
+            "blockChars": 286
+          },
+          {
+            "name": "coding-agent",
+            "blockChars": 270
+          },
+          {
+            "name": "gemini",
+            "blockChars": 212
+          },
+          {
+            "name": "session-logs",
+            "blockChars": 244
+          },
+          {
+            "name": "skill-creator",
+            "blockChars": 287
+          },
+          {
+            "name": "video-frames",
+            "blockChars": 220
+          },
+          {
+            "name": "weather",
+            "blockChars": 211
+          }
+        ]
+      },
+      "tools": {
+        "listChars": 1963,
+        "schemaChars": 13876,
+        "entries": [
+          {
+            "name": "read",
+            "summaryChars": 298,
+            "schemaChars": 398,
+            "propertiesCount": 4
+          },
+          {
+            "name": "edit",
+            "summaryChars": 129,
+            "schemaChars": 617,
+            "propertiesCount": 6
+          },
+          {
+            "name": "write",
+            "summaryChars": 127,
+            "schemaChars": 313,
+            "propertiesCount": 3
+          },
+          {
+            "name": "exec",
+            "summaryChars": 181,
+            "schemaChars": 1037,
+            "propertiesCount": 12
+          },
+          {
+            "name": "process",
+            "summaryChars": 85,
+            "schemaChars": 844,
+            "propertiesCount": 11
+          },
+          {
+            "name": "browser",
+            "summaryChars": 1251,
+            "schemaChars": 1869,
+            "propertiesCount": 28
+          },
+          {
+            "name": "canvas",
+            "summaryChars": 106,
+            "schemaChars": 661,
+            "propertiesCount": 18
+          },
+          {
+            "name": "nodes",
+            "summaryChars": 94,
+            "schemaChars": 1399,
+            "propertiesCount": 31
+          },
+          {
+            "name": "cron",
+            "summaryChars": 1959,
+            "schemaChars": 530,
+            "propertiesCount": 12
+          },
+          {
+            "name": "message",
+            "summaryChars": 89,
+            "schemaChars": 3198,
+            "propertiesCount": 79
+          },
+          {
+            "name": "tts",
+            "summaryChars": 129,
+            "schemaChars": 223,
+            "propertiesCount": 2
+          },
+          {
+            "name": "gateway",
+            "summaryChars": 225,
+            "schemaChars": 465,
+            "propertiesCount": 11
+          },
+          {
+            "name": "agents_list",
+            "summaryChars": 72,
+            "schemaChars": 33,
+            "propertiesCount": 0
+          },
+          {
+            "name": "sessions_list",
+            "summaryChars": 54,
+            "schemaChars": 176,
+            "propertiesCount": 4
+          },
+          {
+            "name": "sessions_history",
+            "summaryChars": 36,
+            "schemaChars": 149,
+            "propertiesCount": 3
+          },
+          {
+            "name": "sessions_send",
+            "summaryChars": 84,
+            "schemaChars": 203,
+            "propertiesCount": 5
+          },
+          {
+            "name": "sessions_spawn",
+            "summaryChars": 107,
+            "schemaChars": 312,
+            "propertiesCount": 8
+          },
+          {
+            "name": "session_status",
+            "summaryChars": 207,
+            "schemaChars": 89,
+            "propertiesCount": 2
+          },
+          {
+            "name": "web_search",
+            "summaryChars": 175,
+            "schemaChars": 733,
+            "propertiesCount": 6
+          },
+          {
+            "name": "web_fetch",
+            "summaryChars": 129,
+            "schemaChars": 360,
+            "propertiesCount": 3
+          },
+          {
+            "name": "memory_search",
+            "summaryChars": 235,
+            "schemaChars": 139,
+            "propertiesCount": 3
+          },
+          {
+            "name": "memory_get",
+            "summaryChars": 188,
+            "schemaChars": 128,
+            "propertiesCount": 3
+          }
+        ]
+      }
+    }
+  },
+  "agent:main:lark:group:https://open.larkoffice.com/open-apis/bot/v2/hook/f2868188-62ed-415d-b6bc-4cf68b46feec": {
+    "chatType": "group",
+    "channel": "lark",
+    "groupId": "https://open.larkoffice.com/open-apis/bot/v2/hook/f2868188-62ed-415d-b6bc-4cf68b46feec",
+    "displayName": "lark:g-https-open.larkoffice.com-open-apis-bot-v2-hook-f2868188-62ed-415d-b6bc-4cf68b46feec",
+    "origin": {
+      "label": "lark:group:https://open.larkoffice.com/open-apis/bot/v2/hook/f2868188-62ed-415d-b6bc-4cf68b46feec",
+      "provider": "lark",
+      "surface": "lark",
+      "chatType": "group",
+      "from": "lark:group:https://open.larkoffice.com/open-apis/bot/v2/hook/f2868188-62ed-415d-b6bc-4cf68b46feec",
+      "to": "channel:https://open.larkoffice.com/open-apis/bot/v2/hook/f2868188-62ed-415d-b6bc-4cf68b46feec"
+    },
+    "sessionId": "4578113d-ec14-4dcc-a5cb-c399e696aaca",
+    "updatedAt": 1769915721672,
+    "deliveryContext": {
+      "channel": "lark"
+    },
+    "lastChannel": "lark",
+    "sessionFile": "/Users/Neo/Opensource/clawdbot/.openclaw-local/agents/main/sessions/4578113d-ec14-4dcc-a5cb-c399e696aaca.jsonl"
+  }
+}

@@ -48,6 +48,8 @@ vi.mock("./unhandled-rejections.js", () => {
 const { startGatewayBonjourAdvertiser } = await import("./bonjour.js");
 
 describe("gateway bonjour advertiser", () => {
+  const getLoggerInfo = vi.fn();
+
   type ServiceCall = {
     name?: unknown;
     hostname?: unknown;
@@ -60,7 +62,7 @@ describe("gateway bonjour advertiser", () => {
   beforeEach(() => {
     vi.spyOn(logging, "getLogger").mockReturnValue({
       info: (...args: unknown[]) => getLoggerInfo(...args),
-    });
+    } as unknown as ReturnType<typeof logging.getLogger>);
   });
 
   afterEach(() => {
@@ -139,7 +141,7 @@ describe("gateway bonjour advertiser", () => {
 
     await started.stop();
     expect(destroy).toHaveBeenCalledTimes(1);
-    expect(shutdown).toHaveBeenCalledTimes(1);
+    expect(shutdown).toHaveBeenCalledTimes(0);
   });
 
   it("omits cliPath and sshPort in minimal mode", async () => {
@@ -257,7 +259,7 @@ describe("gateway bonjour advertiser", () => {
 
     expect(registerUnhandledRejectionHandler).toHaveBeenCalledTimes(1);
     expect(cleanup).toHaveBeenCalledTimes(1);
-    expect(order).toEqual(["shutdown", "cleanup"]);
+    expect(order).toEqual(["cleanup"]);
   });
 
   it("logs advertise failures and retries via watchdog", async () => {

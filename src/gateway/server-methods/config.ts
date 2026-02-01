@@ -18,6 +18,7 @@ import {
   writeRestartSentinel,
 } from "../../infra/restart-sentinel.js";
 import { listChannelPlugins } from "../../channels/plugins/index.js";
+import { listChannelPluginCatalogEntries } from "../../channels/plugins/catalog.js";
 import { loadOpenClawPlugins } from "../../plugins/loader.js";
 import {
   ErrorCodes,
@@ -126,6 +127,25 @@ export const configHandlers: GatewayRequestHandlers = {
         debug: () => {},
       },
     });
+    const installedChannels = listChannelPlugins().map((entry) => ({
+      id: entry.id,
+      label: entry.meta.label,
+      description: entry.meta.blurb,
+      configSchema: entry.configSchema?.schema,
+      configUiHints: entry.configSchema?.uiHints,
+    }));
+    const installedChannelIds = new Set(installedChannels.map((entry) => entry.id));
+    const catalogChannels = listChannelPluginCatalogEntries({ workspaceDir })
+      .filter((entry) => !installedChannelIds.has(entry.id))
+      .map((entry) => ({
+        id: entry.id,
+        label: entry.meta.label,
+        description: entry.meta.blurb,
+        configSchema: {
+          type: "object",
+          additionalProperties: true,
+        },
+      }));
     const schema = buildConfigSchema({
       plugins: pluginRegistry.plugins.map((plugin) => ({
         id: plugin.id,
@@ -134,13 +154,7 @@ export const configHandlers: GatewayRequestHandlers = {
         configUiHints: plugin.configUiHints,
         configSchema: plugin.configJsonSchema,
       })),
-      channels: listChannelPlugins().map((entry) => ({
-        id: entry.id,
-        label: entry.meta.label,
-        description: entry.meta.blurb,
-        configSchema: entry.configSchema?.schema,
-        configUiHints: entry.configSchema?.uiHints,
-      })),
+      channels: [...installedChannels, ...catalogChannels],
     });
     respond(true, schema, undefined);
   },

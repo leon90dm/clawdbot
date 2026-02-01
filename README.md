@@ -103,6 +103,130 @@ pnpm gateway:watch
 
 Note: `pnpm openclaw ...` runs TypeScript directly (via `tsx`). `pnpm build` produces `dist/` for running via Node / the packaged `openclaw` binary.
 
+## 本地启动（项目内开发说明）
+
+下面以本仓库的“源码运行 + 本地 Gateway + TUI/CLI 调试”为主，整理一套可复用的启动命令与配置约定，便于后续查阅。
+
+### 1) 依赖与构建
+
+前置条件：
+
+- Node.js ≥ 22
+- 推荐使用 pnpm
+
+常用命令：
+
+```bash
+pnpm install
+pnpm ui:build
+pnpm build
+```
+
+说明：
+
+- `pnpm openclaw ...` 通过 `tsx` 直接跑 TypeScript（更适合开发调试）。
+- `pnpm build` 生成 `dist/`，更接近“发布版运行方式”。
+
+### 2) 启动 Gateway（推荐：固定端口 + Token）
+
+本项目开发时常用的 Gateway 端口是 `18789`，鉴权 token 使用 `localdev`（可按需修改）。
+
+启动（使用本仓库的 CLI 包装脚本）：
+
+```bash
+./bin/cli.sh gateway --force
+```
+
+健康检查：
+
+```bash
+./bin/cli.sh gateway call health --json
+```
+
+### 3) 启动 TUI / 运行一次 Agent
+
+TUI（会自动读取配置并拼接正确的 ws url/port/token）：
+
+```bash
+./bin/cli.sh tui
+```
+
+跑一次 agent（用于验证模型链路）：
+
+```bash
+./bin/cli.sh agent --session-id smoke --message "Say OK" --timeout 60
+```
+
+### 4) 配置文件与隔离策略（避免污染 ~/.openclaw）
+
+为了让“在仓库里跑”的配置可控、可复现，这里采用了 repo-local 的状态目录：
+
+- 状态目录：`./.openclaw-local/`
+- 主配置：`./.openclaw-local/openclaw.json`
+
+`./bin/cli.sh` 会默认设置：
+
+- `OPENCLAW_STATE_DIR=./.openclaw-local`
+- `OPENCLAW_CONFIG_PATH=./.openclaw-local/openclaw.json`
+
+并从 `openclaw.json` 自动导出（如果你的 shell 里未显式设置）：
+
+- `OPENCLAW_GATEWAY_TOKEN`（用于本地 Gateway / TUI / gateway call）
+- `OPENCLAW_TUI_PORT`（用于生成默认 `--url ws://127.0.0.1:<port>`）
+
+因此在开发时优先用 `./bin/cli.sh ...` 而不是直接用 `pnpm openclaw ...`，可以避免因为系统全局配置或环境变量导致的“跑起来但不一致”的问题。
+
+### 5) Bytedance LLM（自定义 Provider）配置方式
+
+本仓库把 Bytedance LLM 作为一个自定义 provider（示例 provider id：`bytedance-dev1`），模型引用使用 `provider/model` 形式，例如：
+
+- `bytedance-dev1/gpt-5.2`
+
+#### 环境变量（推荐放在本地 .env，不要提交）
+
+本项目示例使用：
+
+- `BYTEDANCE_LLM_BASE_URL`：例如 `http://dev1.bytedance.net:8000`
+- `BYTEDANCE_LLM_API_VERSION`：例如 `2024-02-01`
+- `BYTEDANCE_LLM_AUTH_TOKEN`：你的鉴权 token（敏感信息）
+
+建议：
+
+```bash
+export BYTEDANCE_LLM_BASE_URL="http://dev1.bytedance.net:8000"
+export BYTEDANCE_LLM_API_VERSION="2024-02-01"
+export BYTEDANCE_LLM_AUTH_TOKEN="<YOUR_TOKEN>"
+```
+
+#### OpenClaw 配置（.openclaw-local/openclaw.json）
+
+当前仓库的本地配置里已经写入了 provider 结构（通过 env 变量注入 baseUrl/headers），核心字段如下：
+
+- `models.providers.bytedance-dev1.baseUrl`
+- `models.providers.bytedance-dev1.headers.api-version`
+- `models.providers.bytedance-dev1.headers.auth-token`
+- `models.providers.bytedance-dev1.models[]`（声明该 provider 下有哪些模型 id）
+
+当你看到类似报错：
+
+- `Unknown model: bytedance-dev1/gpt-5.2`
+
+通常意味着：
+
+1) `agents.defaults.model.primary` 指向了某个 model ref，但 `models.providers` 里没有把该 provider/model 声明进 catalog；或
+2) Gateway 启动时没有读取到 env（导致 provider 构建失败/为空）。
+
+可用下面命令快速验证 catalog 是否生效：
+
+```bash
+./bin/cli.sh models list --provider bytedance-dev1 --plain
+```
+
+### 6) 常见排查
+
+- TUI 报 `gateway not connected` / `unauthorized token mismatch`：优先确认你是否通过 `./bin/cli.sh tui` 启动（会自动带上 token/port）；或执行 `./bin/cli.sh gateway call health --json` 验证联通性。
+- 模型相关报错：先用 `./bin/cli.sh models list ...` 确认是否存在，再检查 `.env` 是否在 Gateway 进程环境中生效。
+
 ## Security defaults (DM access)
 
 OpenClaw connects to real messaging surfaces. Treat inbound DMs as **untrusted input**.
