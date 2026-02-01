@@ -2,6 +2,21 @@
 
 Docs: https://docs.openclaw.ai
 
+## 2026.1.31
+
+### Changes
+
+- Telegram: use shared pairing store. (#6127) Thanks @obviyus.
+
+### Fixes
+
+- Auto-reply: avoid referencing workspace files in /new greeting prompt. (#5706) Thanks @bravostation.
+- Process: resolve Windows `spawn()` failures for npm-family CLIs by appending `.cmd` when needed. (#5815) Thanks @thejhinvirtuoso.
+- Docs: update MiniMax OAuth setup commands; Extensions: use OpenClaw plugin SDK for MiniMax OAuth. (#5402) Thanks @Maosghoul.
+- Discord: resolve PluralKit proxied senders for allowlists and labels. (#5838) Thanks @thewilloftheshadow.
+- Telegram: restore draft streaming partials. (#5543) Thanks @obviyus.
+- fix(lobster): block arbitrary exec via lobsterPath/cwd injection (GHSA-4mhr-g7xj-cg8j). (#5335) Thanks @vignesh07.
+
 ## 2026.1.30
 
 ### Changes
@@ -12,6 +27,7 @@ Docs: https://docs.openclaw.ai
 - Auth: switch Kimi Coding to built-in provider; normalize OAuth profile email.
 - Auth: add MiniMax OAuth plugin + onboarding option. (#4521) Thanks @Maosghoul.
 - Agents: update pi SDK/API usage and dependencies.
+- Gateway: inject timestamps into agent and chat.send messages. (#3705) Thanks @conroywhitney, @CashWilliams.
 - Web UI: refresh sessions after chat commands and improve session display names.
 - Build: move TypeScript builds to `tsdown` + `tsgo` (faster builds, CI typechecks), update tsconfig target, and clean up lint rules.
 - Build: align npm tar override and bin metadata so the `openclaw` CLI entrypoint is preserved in npm publishes.
@@ -113,6 +129,7 @@ Docs: https://docs.openclaw.ai
 - Mentions: honor mentionPatterns even when explicit mentions are present. (#3303) Thanks @HirokiKobayashi-R.
 - Discord: restore username directory lookup in target resolution. (#3131) Thanks @bonald.
 - Agents: align MiniMax base URL test expectation with default provider config. (#3131) Thanks @bonald.
+- Agents: respect configured context window cap for compaction safeguard. (#6187) Thanks @iamEvanYT.
 - Agents: prevent retries on oversized image errors and surface size limits. (#2871) Thanks @Suksham-sharma.
 - Agents: inherit provider baseUrl/api for inline models. (#2740) Thanks @lploc94.
 - Memory Search: keep auto provider model defaults and only include remote when configured. (#2576) Thanks @papago2355.

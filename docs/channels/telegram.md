@@ -2,6 +2,7 @@
 summary: "Telegram bot support status, capabilities, and configuration"
 read_when:
   - Working on Telegram features or webhooks
+title: "Telegram"
 ---
 
 # Telegram (Bot API)
@@ -108,6 +109,18 @@ group messages, so use admin if you need full visibility.
 - Replies always route back to the same Telegram chat.
 - Long-polling uses grammY runner with per-chat sequencing; overall concurrency is capped by `agents.defaults.maxConcurrent`.
 - Telegram Bot API does not support read receipts; there is no `sendReadReceipts` option.
+
+## Draft streaming
+
+OpenClaw can stream partial replies in Telegram DMs using `sendMessageDraft`.
+
+Requirements:
+
+- Threaded Mode enabled for the bot in @BotFather (forum topic mode).
+- Private chat threads only (Telegram includes `message_thread_id` on inbound messages).
+- `channels.telegram.streamMode` not set to `"off"` (default: `"partial"`, `"block"` enables chunked draft updates).
+
+Draft streaming is DM-only; Telegram does not support it in groups or channels.
 
 ## Formatting (Telegram HTML)
 
@@ -382,7 +395,7 @@ Most users want: `groupPolicy: "allowlist"` + `groupAllowFrom` + specific groups
 ## Long-polling vs webhook
 
 - Default: long-polling (no public URL required).
-- Webhook mode: set `channels.telegram.webhookUrl` (optionally `channels.telegram.webhookSecret` + `channels.telegram.webhookPath`).
+- Webhook mode: set `channels.telegram.webhookUrl` and `channels.telegram.webhookSecret` (optionally `channels.telegram.webhookPath`).
   - The local listener binds to `0.0.0.0:8787` and serves `POST /telegram-webhook` by default.
   - If your public URL is different, use a reverse proxy and point `channels.telegram.webhookUrl` at the public endpoint.
 
@@ -719,8 +732,8 @@ Provider options:
 - `channels.telegram.retry`: retry policy for outbound Telegram API calls (attempts, minDelayMs, maxDelayMs, jitter).
 - `channels.telegram.network.autoSelectFamily`: override Node autoSelectFamily (true=enable, false=disable). Defaults to disabled on Node 22 to avoid Happy Eyeballs timeouts.
 - `channels.telegram.proxy`: proxy URL for Bot API calls (SOCKS/HTTP).
-- `channels.telegram.webhookUrl`: enable webhook mode.
-- `channels.telegram.webhookSecret`: webhook secret (optional).
+- `channels.telegram.webhookUrl`: enable webhook mode (requires `channels.telegram.webhookSecret`).
+- `channels.telegram.webhookSecret`: webhook secret (required when webhookUrl is set).
 - `channels.telegram.webhookPath`: local webhook path (default `/telegram-webhook`).
 - `channels.telegram.actions.reactions`: gate Telegram tool reactions.
 - `channels.telegram.actions.sendMessage`: gate Telegram tool message sends.
