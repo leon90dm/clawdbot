@@ -68,13 +68,30 @@ describe("createOpenClawCodingTools safeBins", () => {
     expect(execTool).toBeDefined();
 
     const marker = `safe-bins-${Date.now()}`;
-    const result = await execTool!.execute("call1", {
+    const result = (await execTool!.execute("call1", {
       command: `echo ${marker}`,
       workdir: tmpDir,
-    });
+    })) as {
+      content: Array<{ type: string; text?: string }>;
+      details: { status?: string };
+    };
     const text = result.content.find((content) => content.type === "text")?.text ?? "";
 
     expect(result.details.status).toBe("completed");
     expect(text).toContain(marker);
+  });
+
+  it("supports excluding tools by name", () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "openclaw-exclude-tools-"));
+    const tools = createOpenClawCodingTools({
+      excludeTools: ["write", "EDIT"],
+      sessionKey: "agent:main:main",
+      workspaceDir: tmpDir,
+      agentDir: path.join(tmpDir, "agent"),
+    });
+
+    expect(tools.some((tool) => tool.name === "exec")).toBe(true);
+    expect(tools.some((tool) => tool.name === "write")).toBe(false);
+    expect(tools.some((tool) => tool.name === "edit")).toBe(false);
   });
 });

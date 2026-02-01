@@ -47,6 +47,7 @@ export type EmbeddedRunAttemptParams = {
   clientTools?: ClientToolDefinition[];
   /** Disable built-in tools for this run (LLM-only mode). */
   disableTools?: boolean;
+  excludeTools?: string[];
   provider: string;
   modelId: string;
   model: Model<Api>;

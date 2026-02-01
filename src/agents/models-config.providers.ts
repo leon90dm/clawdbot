@@ -450,6 +450,7 @@ async function discoverBytedanceModels(params: {
         cost: BYTEDANCE_DEFAULT_COST,
         contextWindow: BYTEDANCE_DEFAULT_CONTEXT_WINDOW,
         maxTokens: BYTEDANCE_DEFAULT_MAX_TOKENS,
+        compat: { maxTokensField: "max_tokens" },
       });
     }
 

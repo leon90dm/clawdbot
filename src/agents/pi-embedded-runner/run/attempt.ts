@@ -233,6 +233,7 @@ export async function runEmbeddedAttempt(
           workspaceDir: effectiveWorkspace,
           config: params.config,
           abortSignal: runAbortController.signal,
+          excludeTools: params.excludeTools,
           modelProvider: params.model.provider,
           modelId: params.modelId,
           modelAuthMode: resolveModelAuthMode(params.model.provider, params.config),
@@ -510,6 +511,11 @@ export async function runEmbeddedAttempt(
 
       // Force a stable streamFn reference so vitest can reliably mock @mariozechner/pi-ai.
       activeSession.agent.streamFn = streamSimple;
+      if (params.provider === "bytedance-dev1" && params.model.api === "openai-completions") {
+        const underlying = activeSession.agent.streamFn;
+        activeSession.agent.streamFn = (model, context, options) =>
+          underlying(model, context, { maxTokens: model.maxTokens, ...options });
+      }
 
       applyExtraParamsToAgent(
         activeSession.agent,

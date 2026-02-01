@@ -122,6 +122,7 @@ export function createOpenClawCodingTools(options?: {
   workspaceDir?: string;
   config?: OpenClawConfig;
   abortSignal?: AbortSignal;
+  excludeTools?: string[];
   /**
    * Provider of the currently selected model (used for provider-specific tool quirks).
    * Example: "anthropic", "openai", "google", "openai-codex".
@@ -430,5 +431,12 @@ export function createOpenClawCodingTools(options?: {
   // NOTE: Keep canonical (lowercase) tool names here.
   // pi-ai's Anthropic OAuth transport remaps tool names to Claude Code-style names
   // on the wire and maps them back for tool dispatch.
-  return withAbort;
+  const excluded = new Set(
+    (options?.excludeTools ?? [])
+      .map((name) => normalizeToolName(name))
+      .filter((name) => typeof name === "string" && name.length > 0),
+  );
+  return excluded.size > 0
+    ? withAbort.filter((tool) => !excluded.has(normalizeToolName(tool.name)))
+    : withAbort;
 }

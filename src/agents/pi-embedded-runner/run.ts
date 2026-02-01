@@ -305,13 +305,40 @@ export async function runEmbeddedPiAgent(
       }
 
       let overflowCompactionAttempted = false;
+      let toolCallJsonRecoveryStage = 0;
       try {
         while (true) {
           attemptedThinking.add(thinkLevel);
           await fs.mkdir(resolvedWorkspace, { recursive: true });
 
-          const prompt =
+          let prompt =
             provider === "anthropic" ? scrubAnthropicRefusalMagic(params.prompt) : params.prompt;
+          const extraSystemPrompt =
+            toolCallJsonRecoveryStage > 0
+              ? [
+                  params.extraSystemPrompt?.trim(),
+                  [
+                    "IMPORTANT: A previous attempt failed because a tool call's arguments were invalid JSON.",
+                    "Avoid emitting large multi-line strings as tool arguments.",
+                    "Prefer exec with small, chunked here-doc appends (cat >> file <<'EOF' ... EOF).",
+                  ].join(" "),
+                  toolCallJsonRecoveryStage > 1
+                    ? [
+                        "IMPORTANT: write/edit are disabled for this retry.",
+                        "Use exec only; keep each tool call payload small and append in chunks.",
+                      ].join(" ")
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join("\n\n")
+              : params.extraSystemPrompt;
+          if (toolCallJsonRecoveryStage > 0) {
+            prompt = `${[
+              "IMPORTANT: Tool call arguments must be valid JSON.",
+              "Avoid emitting large multi-line strings as tool arguments; split into multiple tool calls.",
+              "Prefer exec with chunked here-doc appends for file writes/updates.",
+            ].join(" ")}\n\n${prompt}`;
+          }
 
           const attempt = await runEmbeddedAttempt({
             sessionId: params.sessionId,
@@ -337,6 +364,7 @@ export async function runEmbeddedPiAgent(
             prompt,
             images: params.images,
             disableTools: params.disableTools,
+            excludeTools: toolCallJsonRecoveryStage > 1 ? ["write", "edit"] : undefined,
             provider,
             modelId,
             model,
@@ -362,7 +390,7 @@ export async function runEmbeddedPiAgent(
             onReasoningStream: params.onReasoningStream,
             onToolResult: params.onToolResult,
             onAgentEvent: params.onAgentEvent,
-            extraSystemPrompt: params.extraSystemPrompt,
+            extraSystemPrompt,
             streamParams: params.streamParams,
             ownerNumbers: params.ownerNumbers,
             enforceFinalTag: params.enforceFinalTag,
@@ -481,6 +509,15 @@ export async function runEmbeddedPiAgent(
                 },
               };
             }
+            if (
+              toolCallJsonRecoveryStage < 2 &&
+              /unterminated string in json|unexpected end of json input|json at position/i.test(
+                errorText,
+              )
+            ) {
+              toolCallJsonRecoveryStage += 1;
+              continue;
+            }
             const promptFailoverReason = classifyFailoverReason(errorText);
             if (promptFailoverReason && promptFailoverReason !== "timeout" && lastProfileId) {
               await markAuthProfileFailure({
@@ -521,6 +558,17 @@ export async function runEmbeddedPiAgent(
               });
             }
             throw promptError;
+          }
+
+          if (
+            !aborted &&
+            toolCallJsonRecoveryStage < 2 &&
+            /unterminated string in json|unexpected end of json input|json at position/i.test(
+              lastAssistant?.errorMessage ?? "",
+            )
+          ) {
+            toolCallJsonRecoveryStage += 1;
+            continue;
           }
 
           const fallbackThinking = pickFallbackThinkingLevel({

@@ -10,6 +10,8 @@ import { ensureOpenClawModelsJson } from "./models-config.js";
 vi.mock("@mariozechner/pi-ai", async () => {
   const actual = await vi.importActual<typeof import("@mariozechner/pi-ai")>("@mariozechner/pi-ai");
 
+  const toolJsonErrorCounts = new Map<string, number>();
+
   const buildAssistantMessage = (model: { api: string; provider: string; id: string }) => ({
     role: "assistant" as const,
     content: [{ type: "text" as const, text: "ok" }],
@@ -34,11 +36,14 @@ vi.mock("@mariozechner/pi-ai", async () => {
     timestamp: Date.now(),
   });
 
-  const buildAssistantErrorMessage = (model: { api: string; provider: string; id: string }) => ({
+  const buildAssistantErrorMessage = (
+    model: { api: string; provider: string; id: string },
+    errorMessage = "boom",
+  ) => ({
     role: "assistant" as const,
-    content: [] as const,
+    content: [] as Array<{ type: "text"; text: string }>,
     stopReason: "error" as const,
-    errorMessage: "boom",
+    errorMessage,
     api: model.api,
     provider: model.provider,
     model: model.id,
@@ -59,11 +64,24 @@ vi.mock("@mariozechner/pi-ai", async () => {
     timestamp: Date.now(),
   });
 
+  const isToolJsonErrorModel = (modelId: string) => modelId.startsWith("mock-tool-json-error");
+  const shouldToolJsonError = (modelId: string) => {
+    if (!isToolJsonErrorModel(modelId)) {
+      return false;
+    }
+    const current = toolJsonErrorCounts.get(modelId) ?? 0;
+    toolJsonErrorCounts.set(modelId, current + 1);
+    return current === 0;
+  };
+
   return {
     ...actual,
     complete: async (model: { api: string; provider: string; id: string }) => {
       if (model.id === "mock-error") {
         return buildAssistantErrorMessage(model);
+      }
+      if (shouldToolJsonError(model.id)) {
+        return buildAssistantErrorMessage(model, "Unexpected end of JSON input");
       }
       return buildAssistantMessage(model);
     },
@@ -71,10 +89,13 @@ vi.mock("@mariozechner/pi-ai", async () => {
       if (model.id === "mock-error") {
         return buildAssistantErrorMessage(model);
       }
+      if (shouldToolJsonError(model.id)) {
+        return buildAssistantErrorMessage(model, "Unexpected end of JSON input");
+      }
       return buildAssistantMessage(model);
     },
     streamSimple: (model: { api: string; provider: string; id: string }) => {
-      const stream = new actual.AssistantMessageEventStream();
+      const stream = actual.createAssistantMessageEventStream();
       queueMicrotask(() => {
         stream.push({
           type: "done",
@@ -82,7 +103,9 @@ vi.mock("@mariozechner/pi-ai", async () => {
           message:
             model.id === "mock-error"
               ? buildAssistantErrorMessage(model)
-              : buildAssistantMessage(model),
+              : shouldToolJsonError(model.id)
+                ? buildAssistantErrorMessage(model, "Unexpected end of JSON input")
+                : buildAssistantMessage(model),
         });
         stream.end();
       });
@@ -205,6 +228,7 @@ describe("runEmbeddedPiAgent", () => {
       runEmbeddedPiAgent({
         sessionId: "session:test",
         sessionKey: testSessionKey,
+        runId: "run:test",
         sessionFile,
         workspaceDir,
         config: cfg,
@@ -231,6 +255,7 @@ describe("runEmbeddedPiAgent", () => {
       await runEmbeddedPiAgent({
         sessionId: "session:test",
         sessionKey: testSessionKey,
+        runId: "run:test",
         sessionFile,
         workspaceDir,
         config: cfg,
@@ -262,6 +287,7 @@ describe("runEmbeddedPiAgent", () => {
     const result = await runEmbeddedPiAgent({
       sessionId: "session:test",
       sessionKey: testSessionKey,
+      runId: "run:test",
       sessionFile,
       workspaceDir,
       config: cfg,
@@ -272,13 +298,41 @@ describe("runEmbeddedPiAgent", () => {
       agentDir,
       enqueue: immediateEnqueue,
     });
-    expect(result.payloads[0]?.isError).toBe(true);
+    expect(result.payloads?.[0]?.isError).toBe(true);
 
     const messages = await readSessionMessages(sessionFile);
     const userIndex = messages.findIndex(
       (message) => message?.role === "user" && textFromContent(message.content) === "boom",
     );
     expect(userIndex).toBeGreaterThanOrEqual(0);
+  });
+
+  it("retries when assistant output fails to parse tool call JSON", async () => {
+    const sessionFile = nextSessionFile();
+    const modelId = `mock-tool-json-error-${sessionCounter}`;
+    const cfg = makeOpenAiConfig([modelId]);
+    await ensureModels(cfg);
+
+    const result = await runEmbeddedPiAgent({
+      sessionId: "session:test",
+      sessionKey: testSessionKey,
+      runId: "run:test",
+      sessionFile,
+      workspaceDir,
+      config: cfg,
+      prompt: "write snake html game",
+      provider: "openai",
+      model: modelId,
+      timeoutMs: 5_000,
+      agentDir,
+      enqueue: immediateEnqueue,
+    });
+
+    expect(result.meta.error).toBeUndefined();
+    expect(result.payloads?.length ?? 0).toBeGreaterThan(0);
+
+    const raw = await fs.readFile(sessionFile, "utf-8");
+    expect(raw).toContain("Unexpected end of JSON input");
   });
 
   it(
@@ -292,6 +346,7 @@ describe("runEmbeddedPiAgent", () => {
       sessionManager.appendMessage({
         role: "user",
         content: [{ type: "text", text: "seed user" }],
+        timestamp: Date.now(),
       });
       sessionManager.appendMessage({
         role: "assistant",
@@ -323,6 +378,7 @@ describe("runEmbeddedPiAgent", () => {
       await runEmbeddedPiAgent({
         sessionId: "session:test",
         sessionKey: testSessionKey,
+        runId: "run:test",
         sessionFile,
         workspaceDir,
         config: cfg,
@@ -363,6 +419,7 @@ describe("runEmbeddedPiAgent", () => {
     await runEmbeddedPiAgent({
       sessionId: "session:test",
       sessionKey: testSessionKey,
+      runId: "run:test",
       sessionFile,
       workspaceDir,
       config: cfg,
@@ -377,6 +434,7 @@ describe("runEmbeddedPiAgent", () => {
     await runEmbeddedPiAgent({
       sessionId: "session:test",
       sessionKey: testSessionKey,
+      runId: "run:test",
       sessionFile,
       workspaceDir,
       config: cfg,
@@ -419,6 +477,7 @@ describe("runEmbeddedPiAgent", () => {
     sessionManager.appendMessage({
       role: "user",
       content: [{ type: "text", text: "orphaned user" }],
+      timestamp: Date.now(),
     });
 
     const cfg = makeOpenAiConfig(["mock-1"]);
@@ -427,6 +486,7 @@ describe("runEmbeddedPiAgent", () => {
     const result = await runEmbeddedPiAgent({
       sessionId: "session:test",
       sessionKey: testSessionKey,
+      runId: "run:test",
       sessionFile,
       workspaceDir,
       config: cfg,
@@ -450,6 +510,7 @@ describe("runEmbeddedPiAgent", () => {
     sessionManager.appendMessage({
       role: "user",
       content: [{ type: "text", text: "solo user" }],
+      timestamp: Date.now(),
     });
 
     const cfg = makeOpenAiConfig(["mock-1"]);
@@ -458,6 +519,7 @@ describe("runEmbeddedPiAgent", () => {
     const result = await runEmbeddedPiAgent({
       sessionId: "session:test",
       sessionKey: testSessionKey,
+      runId: "run:test",
       sessionFile,
       workspaceDir,
       config: cfg,

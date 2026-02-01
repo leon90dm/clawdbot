@@ -1,14 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { isCloudCodeAssistFormatError } from "./pi-embedded-helpers.js";
-import { DEFAULT_AGENTS_FILENAME } from "./workspace.js";
-
-const _makeFile = (overrides: Partial<WorkspaceBootstrapFile>): WorkspaceBootstrapFile => ({
-  name: DEFAULT_AGENTS_FILENAME,
-  path: "/tmp/AGENTS.md",
-  content: "",
-  missing: false,
-  ...overrides,
-});
 describe("isCloudCodeAssistFormatError", () => {
   it("matches format errors", () => {
     const samples = [
@@ -16,6 +7,7 @@ describe("isCloudCodeAssistFormatError", () => {
       "messages.1.content.1.tool_use.id",
       "tool_use.id should match pattern",
       "invalid request format",
+      "Unterminated string in JSON at position 2902 (line 1 column 2903)",
     ];
     for (const sample of samples) {
       expect(isCloudCodeAssistFormatError(sample)).toBe(true);

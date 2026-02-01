@@ -463,6 +463,9 @@ const ERROR_PATTERNS = {
     "tool_use_id",
     "messages.1.content.1.tool_use.id",
     "invalid request format",
+    "unterminated string in json",
+    "unexpected end of json input",
+    "json at position",
   ],
 } as const;
 
