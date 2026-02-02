@@ -213,8 +213,8 @@ export BYTEDANCE_LLM_AUTH_TOKEN="<YOUR_TOKEN>"
 
 通常意味着：
 
-1) `agents.defaults.model.primary` 指向了某个 model ref，但 `models.providers` 里没有把该 provider/model 声明进 catalog；或
-2) Gateway 启动时没有读取到 env（导致 provider 构建失败/为空）。
+1. `agents.defaults.model.primary` 指向了某个 model ref，但 `models.providers` 里没有把该 provider/model 声明进 catalog；或
+2. Gateway 启动时没有读取到 env（导致 provider 构建失败/为空）。
 
 可用下面命令快速验证 catalog 是否生效：
 

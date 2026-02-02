@@ -3,7 +3,11 @@ name: coding-agent
 description: Run Codex CLI, Claude Code, OpenCode, or Pi Coding Agent via background process for programmatic control.
 metadata:
   {
-    "openclaw": { "emoji": "🧩", "requires": { "anyBins": ["ccr", "ccrcode", "claude", "codex", "opencode", "pi"] } },
+    "openclaw":
+      {
+        "emoji": "🧩",
+        "requires": { "anyBins": ["ccr", "ccrcode", "claude", "codex", "opencode", "pi"] },
+      },
   }
 ---
 

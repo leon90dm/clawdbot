@@ -136,11 +136,11 @@ export BYTEDANCE_LLM_AUTH_TOKEN="<YOUR_TOKEN>"
 
 关键点：
 
-1) 默认模型指向：
+1. 默认模型指向：
 
 - `agents.defaults.model.primary = "bytedance-dev1/gpt-5.2"`
 
-2) 必须在 `models.providers` 中声明 provider 与 model catalog，否则会报：
+2. 必须在 `models.providers` 中声明 provider 与 model catalog，否则会报：
 
 - `Unknown model: bytedance-dev1/gpt-5.2`
 
@@ -181,9 +181,9 @@ bytedance-dev1/gpt-5.2
 
 排查顺序：
 
-1) `./bin/cli.sh models list --provider bytedance-dev1 --plain`
-2) 检查 `./.openclaw-local/openclaw.json` 中是否存在 `models.providers.bytedance-dev1`
-3) 确认 Gateway 的运行环境里能读取到 `BYTEDANCE_LLM_AUTH_TOKEN`（最常见缺失项）
+1. `./bin/cli.sh models list --provider bytedance-dev1 --plain`
+2. 检查 `./.openclaw-local/openclaw.json` 中是否存在 `models.providers.bytedance-dev1`
+3. 确认 Gateway 的运行环境里能读取到 `BYTEDANCE_LLM_AUTH_TOKEN`（最常见缺失项）
 
 ### 8.2 `gateway not connected`
 
@@ -230,4 +230,3 @@ pnpm build
 # 查看 provider 下的模型列表
 ./bin/cli.sh models list --provider bytedance-dev1 --plain
 ```
-

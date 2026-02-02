@@ -28,6 +28,18 @@ export const DEFAULT_BOOTSTRAP_FILENAME = "BOOTSTRAP.md";
 export const DEFAULT_MEMORY_FILENAME = "MEMORY.md";
 export const DEFAULT_MEMORY_ALT_FILENAME = "memory.md";
 
+const DEFAULT_MEMORY_CONTENT = [
+  "# Memory",
+  "",
+  "This workspace keeps a lightweight, file-based memory log.",
+  "",
+  "- Main index: `MEMORY.md`",
+  "- Daily notes: `memory/YYYY-MM-DD-*.md`",
+  "",
+  "Search uses `MEMORY.md` + `memory/*.md` (and optional session transcripts).",
+  "",
+].join("\n");
+
 function stripFrontMatter(content: string): string {
   if (!content.startsWith("---")) {
     return content;
@@ -150,6 +162,8 @@ export async function ensureAgentWorkspace(params?: {
   const userPath = path.join(dir, DEFAULT_USER_FILENAME);
   const heartbeatPath = path.join(dir, DEFAULT_HEARTBEAT_FILENAME);
   const bootstrapPath = path.join(dir, DEFAULT_BOOTSTRAP_FILENAME);
+  const memoryPath = path.join(dir, DEFAULT_MEMORY_FILENAME);
+  const memoryDir = path.join(dir, "memory");
 
   const isBrandNewWorkspace = await (async () => {
     const paths = [agentsPath, soulPath, toolsPath, identityPath, userPath, heartbeatPath];
@@ -183,6 +197,8 @@ export async function ensureAgentWorkspace(params?: {
   if (isBrandNewWorkspace) {
     await writeFileIfMissing(bootstrapPath, bootstrapTemplate);
   }
+  await fs.mkdir(memoryDir, { recursive: true });
+  await writeFileIfMissing(memoryPath, DEFAULT_MEMORY_CONTENT);
   await ensureGitRepo(dir, isBrandNewWorkspace);
 
   return {

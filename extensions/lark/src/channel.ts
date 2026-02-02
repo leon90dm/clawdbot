@@ -6,7 +6,6 @@ import {
   type ChannelPlugin,
   type OpenClawConfig,
 } from "openclaw/plugin-sdk";
-
 import { LarkConfigSchema } from "./config-schema.js";
 import { sendLarkWebhookMessage } from "./send.js";
 
@@ -180,7 +179,12 @@ export const larkPlugin: ChannelPlugin<ResolvedLarkAccount> = {
       if (!res.ok) {
         throw new Error(res.error);
       }
-      return { channel: "lark", messageId: "unknown", chatId: to, meta: { response: res.response } };
+      return {
+        channel: "lark",
+        messageId: "unknown",
+        chatId: to,
+        meta: { response: res.response },
+      };
     },
     sendMedia: async ({ cfg, to, text, mediaUrl, accountId }) => {
       const account = resolveLarkAccount({ cfg, accountId });
@@ -200,7 +204,12 @@ export const larkPlugin: ChannelPlugin<ResolvedLarkAccount> = {
       if (!res.ok) {
         throw new Error(res.error);
       }
-      return { channel: "lark", messageId: "unknown", chatId: to, meta: { response: res.response } };
+      return {
+        channel: "lark",
+        messageId: "unknown",
+        chatId: to,
+        meta: { response: res.response },
+      };
     },
   },
   messaging: {

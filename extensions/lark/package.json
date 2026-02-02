@@ -10,7 +10,9 @@
     "openclaw": "workspace:*"
   },
   "openclaw": {
-    "extensions": ["./index.ts"],
+    "extensions": [
+      "./index.ts"
+    ],
     "channel": {
       "id": "lark",
       "label": "Lark/Feishu",

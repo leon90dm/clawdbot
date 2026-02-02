@@ -63,6 +63,7 @@ type MemoryIndexMeta = {
   chunkTokens: number;
   chunkOverlap: number;
   vectorDims?: number;
+  sources?: MemorySource[];
 };
 
 type SessionFileEntry = {
@@ -97,8 +98,10 @@ const EMBEDDING_BATCH_MAX_TOKENS = 8000;
 const EMBEDDING_APPROX_CHARS_PER_TOKEN = 1;
 const EMBEDDING_INDEX_CONCURRENCY = 4;
 const EMBEDDING_RETRY_MAX_ATTEMPTS = 3;
+const EMBEDDING_RETRY_REMOTE_MAX_ATTEMPTS = 8;
 const EMBEDDING_RETRY_BASE_DELAY_MS = 500;
 const EMBEDDING_RETRY_MAX_DELAY_MS = 8000;
+const EMBEDDING_RETRY_REMOTE_MAX_DELAY_MS = 60_000;
 const BATCH_FAILURE_LIMIT = 2;
 const SESSION_DELTA_READ_CHUNK_BYTES = 64 * 1024;
 const VECTOR_LOAD_TIMEOUT_MS = 30_000;
@@ -297,7 +300,7 @@ export class MemoryIndexManager {
       ? await this.searchKeyword(cleaned, candidates).catch(() => [])
       : [];
 
-    const queryVec = await this.embedQueryWithTimeout(cleaned);
+    const queryVec = await this.embedQueryWithRetry(cleaned);
     const hasVector = queryVec.some((v) => v !== 0);
     const vectorResults = hasVector
       ? await this.searchVector(queryVec, candidates).catch(() => [])
@@ -1319,6 +1322,12 @@ export class MemoryIndexManager {
     }
     const vectorReady = await this.ensureVectorReady();
     const meta = this.readMeta();
+    const metaSources = (() => {
+      const sources = meta?.sources?.length ? meta.sources : ["memory"];
+      return Array.from(new Set(sources)).toSorted();
+    })();
+    const currentSources = Array.from(this.sources).toSorted();
+    const sourcesChanged = Boolean(meta) && metaSources.join("|") !== currentSources.join("|");
     const needsFullReindex =
       params?.force ||
       !meta ||
@@ -1339,8 +1348,12 @@ export class MemoryIndexManager {
       }
 
       const shouldSyncMemory =
-        this.sources.has("memory") && (params?.force || needsFullReindex || this.dirty);
-      const shouldSyncSessions = this.shouldSyncSessions(params, needsFullReindex);
+        this.sources.has("memory") &&
+        (params?.force || needsFullReindex || this.dirty || sourcesChanged);
+      const shouldSyncSessions = this.shouldSyncSessions(
+        params,
+        needsFullReindex || sourcesChanged,
+      );
 
       if (shouldSyncMemory) {
         await this.syncMemoryFiles({ needsFullReindex, progress: progress ?? undefined });
@@ -1355,6 +1368,22 @@ export class MemoryIndexManager {
         this.sessionsDirty = true;
       } else {
         this.sessionsDirty = false;
+      }
+      if (sourcesChanged) {
+        const nextMeta: MemoryIndexMeta = {
+          model: this.provider.model,
+          provider: this.provider.id,
+          providerKey: this.providerKey,
+          chunkTokens: this.settings.chunking.tokens,
+          chunkOverlap: this.settings.chunking.overlap,
+          sources: currentSources,
+        };
+        if (this.vector.available && this.vector.dims) {
+          nextMeta.vectorDims = this.vector.dims;
+        } else if (meta.vectorDims) {
+          nextMeta.vectorDims = meta.vectorDims;
+        }
+        this.writeMeta(nextMeta);
       }
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
@@ -1510,6 +1539,7 @@ export class MemoryIndexManager {
         providerKey: this.providerKey,
         chunkTokens: this.settings.chunking.tokens,
         chunkOverlap: this.settings.chunking.overlap,
+        sources: Array.from(this.sources).toSorted(),
       };
       if (this.vector.available && this.vector.dims) {
         nextMeta.vectorDims = this.vector.dims;
@@ -2072,6 +2102,14 @@ export class MemoryIndexManager {
     if (texts.length === 0) {
       return [];
     }
+    const maxAttempts =
+      this.provider.id === "local"
+        ? EMBEDDING_RETRY_MAX_ATTEMPTS
+        : EMBEDDING_RETRY_REMOTE_MAX_ATTEMPTS;
+    const maxDelayMs =
+      this.provider.id === "local"
+        ? EMBEDDING_RETRY_MAX_DELAY_MS
+        : EMBEDDING_RETRY_REMOTE_MAX_DELAY_MS;
     let attempt = 0;
     let delayMs = EMBEDDING_RETRY_BASE_DELAY_MS;
     while (true) {
@@ -2089,14 +2127,11 @@ export class MemoryIndexManager {
         );
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        if (!this.isRetryableEmbeddingError(message) || attempt >= EMBEDDING_RETRY_MAX_ATTEMPTS) {
+        if (!this.isRetryableEmbeddingError(message) || attempt >= maxAttempts) {
           throw err;
         }
-        const waitMs = Math.min(
-          EMBEDDING_RETRY_MAX_DELAY_MS,
-          Math.round(delayMs * (1 + Math.random() * 0.2)),
-        );
-        log.warn(`memory embeddings rate limited; retrying in ${waitMs}ms`);
+        const waitMs = Math.min(maxDelayMs, Math.round(delayMs * (1 + Math.random() * 0.2)));
+        log.warn(`memory embeddings failed; retrying in ${waitMs}ms`);
         await new Promise((resolve) => setTimeout(resolve, waitMs));
         delayMs *= 2;
         attempt += 1;
@@ -2105,7 +2140,14 @@ export class MemoryIndexManager {
   }
 
   private isRetryableEmbeddingError(message: string): boolean {
-    return /(rate[_ ]limit|too many requests|429|resource has been exhausted|5\d\d|cloudflare)/i.test(
+    if (
+      /(insufficient_quota|invalid[_ ]api[_ ]key|invalid api key|no api key|api[_ ]key.*(missing|invalid))/i.test(
+        message,
+      )
+    ) {
+      return false;
+    }
+    return /(rate[_ ]limit|too many requests|429|resource has been exhausted|5\d\d|cloudflare|eof|econnreset|etimedout|econnrefused|socket hang up|fetch failed|network)/i.test(
       message,
     );
   }
@@ -2116,6 +2158,38 @@ export class MemoryIndexManager {
       return isLocal ? EMBEDDING_QUERY_TIMEOUT_LOCAL_MS : EMBEDDING_QUERY_TIMEOUT_REMOTE_MS;
     }
     return isLocal ? EMBEDDING_BATCH_TIMEOUT_LOCAL_MS : EMBEDDING_BATCH_TIMEOUT_REMOTE_MS;
+  }
+
+  private async embedQueryWithRetry(text: string): Promise<number[]> {
+    const cleaned = text.trim();
+    if (!cleaned) {
+      return [];
+    }
+    const maxAttempts =
+      this.provider.id === "local"
+        ? EMBEDDING_RETRY_MAX_ATTEMPTS
+        : EMBEDDING_RETRY_REMOTE_MAX_ATTEMPTS;
+    const maxDelayMs =
+      this.provider.id === "local"
+        ? EMBEDDING_RETRY_MAX_DELAY_MS
+        : EMBEDDING_RETRY_REMOTE_MAX_DELAY_MS;
+    let attempt = 0;
+    let delayMs = EMBEDDING_RETRY_BASE_DELAY_MS;
+    while (true) {
+      try {
+        return await this.embedQueryWithTimeout(cleaned);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (!this.isRetryableEmbeddingError(message) || attempt >= maxAttempts) {
+          throw err;
+        }
+        const waitMs = Math.min(maxDelayMs, Math.round(delayMs * (1 + Math.random() * 0.2)));
+        log.warn(`memory embeddings failed; retrying in ${waitMs}ms`);
+        await new Promise((resolve) => setTimeout(resolve, waitMs));
+        delayMs *= 2;
+        attempt += 1;
+      }
+    }
   }
 
   private async embedQueryWithTimeout(text: string): Promise<number[]> {
@@ -2292,7 +2366,13 @@ export class MemoryIndexManager {
   }
 
   private getIndexConcurrency(): number {
-    return this.batch.enabled ? this.batch.concurrency : EMBEDDING_INDEX_CONCURRENCY;
+    if (this.batch.enabled) {
+      return this.batch.concurrency;
+    }
+    if (this.provider.id !== "local") {
+      return 1;
+    }
+    return EMBEDDING_INDEX_CONCURRENCY;
   }
 
   private async indexFile(

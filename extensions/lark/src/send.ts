@@ -101,7 +101,10 @@ export async function sendLarkWebhookMessage(params: {
   if (typeof statusCode === "number" && statusCode !== 0) {
     const statusMessage = (json as { StatusMessage?: unknown } | null)?.StatusMessage;
     const msg = typeof statusMessage === "string" ? statusMessage.trim() : "";
-    return { ok: false, error: `Lark webhook rejected message: ${statusCode}${msg ? ` (${msg})` : ""}` };
+    return {
+      ok: false,
+      error: `Lark webhook rejected message: ${statusCode}${msg ? ` (${msg})` : ""}`,
+    };
   }
 
   return { ok: true, response: json };
