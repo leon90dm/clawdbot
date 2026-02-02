@@ -1,0 +1,1 @@
+OPENCLAW_GATEWAY_TOKEN=localdev ./bin/cli.sh tui

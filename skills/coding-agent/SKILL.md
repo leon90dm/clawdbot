@@ -3,7 +3,7 @@ name: coding-agent
 description: Run Codex CLI, Claude Code, OpenCode, or Pi Coding Agent via background process for programmatic control.
 metadata:
   {
-    "openclaw": { "emoji": "🧩", "requires": { "anyBins": ["claude", "codex", "opencode", "pi"] } },
+    "openclaw": { "emoji": "🧩", "requires": { "anyBins": ["ccr", "ccrcode", "claude", "codex", "opencode", "pi"] } },
   }
 ---
 
@@ -163,6 +163,29 @@ bash pty:true workdir:~/project command:"claude 'Your task'"
 
 # Background
 bash pty:true workdir:~/project background:true command:"claude 'Your task'"
+```
+
+---
+
+## CCR (ccr code / ccrcode)
+
+```bash
+# With PTY for proper terminal output
+bash pty:true workdir:~/project command:"ccr code 'Your task'"
+
+# Background
+bash pty:true workdir:~/project background:true command:"ccr code 'Your task'"
+```
+
+Notes:
+
+- OpenClaw runs commands in a non-interactive shell; it will not load your zsh aliases. If `ccrcode` is just an alias for `ccr code`, it will not work here. Use `ccr code ...` directly, or install a real `ccrcode` executable on PATH.
+- `ccr code` is a wrapper around the **Claude Code CLI** (same flags/subcommands). If `ccr` isn't available, you can usually run the same command with `claude`:
+  - `ccr code -p 'Your task'` ≈ `claude -p 'Your task'`
+- If CCR/Claude Code gets stuck on a workspace trust prompt, use print mode to skip it:
+
+```bash
+bash pty:true workdir:~/project command:"ccr code -p 'Your task'"
 ```
 
 ---

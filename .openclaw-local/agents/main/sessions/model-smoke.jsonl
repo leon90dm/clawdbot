@@ -1,6 +1,0 @@
-{"type":"session","version":3,"id":"model-smoke","timestamp":"2026-01-31T15:17:50.518Z","cwd":"/Users/Neo/.openclaw/workspace"}
-{"type":"model_change","id":"cfbe0bc1","parentId":null,"timestamp":"2026-01-31T15:17:50.525Z","provider":"bytedance-dev1","modelId":"gpt-5.2"}
-{"type":"thinking_level_change","id":"da5adb99","parentId":"cfbe0bc1","timestamp":"2026-01-31T15:17:50.525Z","thinkingLevel":"low"}
-{"type":"custom","customType":"model-snapshot","data":{"timestamp":1769872670527,"provider":"bytedance-dev1","modelApi":"openai-completions","modelId":"gpt-5.2"},"id":"fb38d389","parentId":"da5adb99","timestamp":"2026-01-31T15:17:50.527Z"}
-{"type":"message","id":"69003f14","parentId":"fb38d389","timestamp":"2026-01-31T15:17:50.535Z","message":{"role":"user","content":[{"type":"text","text":"Say OK"}],"timestamp":1769872670530}}
-{"type":"message","id":"73074655","parentId":"69003f14","timestamp":"2026-01-31T15:17:54.201Z","message":{"role":"assistant","content":[{"type":"text","text":"OK"}],"api":"openai-completions","provider":"bytedance-dev1","model":"gpt-5.2","usage":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"totalTokens":0,"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0,"total":0}},"stopReason":"stop","timestamp":1769872670534}}
