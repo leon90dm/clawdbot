@@ -11,12 +11,14 @@ vi.mock("../agents/model-auth.js", () => ({
   },
 }));
 
+type FetchMock = ReturnType<typeof vi.fn>;
+
 const createFetchMock = () =>
-  vi.fn(async () => ({
+  vi.fn(async (_input: unknown, _init?: unknown) => ({
     ok: true,
     status: 200,
     json: async () => ({ data: [{ embedding: [1, 2, 3] }] }),
-  })) as unknown as typeof fetch;
+  })) as FetchMock;
 
 describe("embedding provider remote overrides", () => {
   afterEach(() => {
@@ -27,7 +29,7 @@ describe("embedding provider remote overrides", () => {
 
   it("uses remote baseUrl/apiKey and merges headers", async () => {
     const fetchMock = createFetchMock();
-    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
 
     const { createEmbeddingProvider } = await import("./embeddings.js");
     const authModule = await import("../agents/model-auth.js");
@@ -81,7 +83,7 @@ describe("embedding provider remote overrides", () => {
 
   it("falls back to resolved api key when remote apiKey is blank", async () => {
     const fetchMock = createFetchMock();
-    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
 
     const { createEmbeddingProvider } = await import("./embeddings.js");
     const authModule = await import("../agents/model-auth.js");
@@ -119,13 +121,109 @@ describe("embedding provider remote overrides", () => {
     expect(headers.Authorization).toBe("Bearer provider-key");
   });
 
+  it("allows missing api key for non-OpenAI baseUrl and normalizes /v1", async () => {
+    const fetchMock = createFetchMock();
+    vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
+
+    const { createEmbeddingProvider } = await import("./embeddings.js");
+    const authModule = await import("../agents/model-auth.js");
+    vi.mocked(authModule.resolveApiKeyForProvider).mockRejectedValue(
+      new Error('No API key found for provider "openai".'),
+    );
+
+    const result = await createEmbeddingProvider({
+      config: {} as never,
+      provider: "openai",
+      remote: {
+        baseUrl: "http://ollama.example:11434",
+      },
+      model: "nomic-embed-text",
+      fallback: "openai",
+    });
+
+    await result.provider.embedQuery("hello");
+
+    expect(authModule.resolveApiKeyForProvider).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] ?? [];
+    expect(url).toBe("http://ollama.example:11434/v1/embeddings");
+    const headers = (init?.headers ?? {}) as Record<string, string>;
+    expect(headers.Authorization).toBeUndefined();
+    expect(headers["Content-Type"]).toBe("application/json");
+  });
+
+  it("builds Ollama embeddings requests with normalized /v1 baseUrl", async () => {
+    const fetchMock = createFetchMock();
+    vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
+
+    const { createEmbeddingProvider } = await import("./embeddings.js");
+
+    const result = await createEmbeddingProvider({
+      config: {} as never,
+      provider: "ollama",
+      remote: {
+        baseUrl: "http://ollama.example:11434",
+      },
+      model: "nomic-embed-text",
+      fallback: "none",
+    });
+
+    await result.provider.embedQuery("hello");
+
+    const [url, init] = fetchMock.mock.calls[0] ?? [];
+    expect(url).toBe("http://ollama.example:11434/v1/embeddings");
+    const headers = (init?.headers ?? {}) as Record<string, string>;
+    expect(headers.Authorization).toBeUndefined();
+    expect(headers["Content-Type"]).toBe("application/json");
+  });
+
+  it("falls back to native Ollama embed endpoint when /v1/embeddings is unavailable", async () => {
+    const fetchMock = vi.fn(async (input: unknown) => {
+      const url = String(input);
+      if (url === "http://ollama.example:11434/v1/embeddings") {
+        return {
+          ok: false,
+          status: 404,
+          text: async () => "not found",
+        };
+      }
+      if (url === "http://ollama.example:11434/api/embed") {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ embeddings: [[1, 2, 3]] }),
+        };
+      }
+      throw new Error(`Unexpected url ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
+
+    const { createEmbeddingProvider } = await import("./embeddings.js");
+    const result = await createEmbeddingProvider({
+      config: {} as never,
+      provider: "ollama",
+      remote: {
+        baseUrl: "http://ollama.example:11434",
+      },
+      model: "nomic-embed-text",
+      fallback: "none",
+    });
+
+    await result.provider.embedQuery("hello");
+    await result.provider.embedQuery("world");
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("http://ollama.example:11434/v1/embeddings");
+    expect(fetchMock.mock.calls[1]?.[0]).toBe("http://ollama.example:11434/v1/embeddings");
+    expect(fetchMock.mock.calls[2]?.[0]).toBe("http://ollama.example:11434/api/embed");
+    expect(fetchMock.mock.calls[3]?.[0]).toBe("http://ollama.example:11434/api/embed");
+  });
+
   it("builds Gemini embeddings requests with api key header", async () => {
-    const fetchMock = vi.fn(async () => ({
+    const fetchMock = vi.fn(async (_input: unknown, _init?: unknown) => ({
       ok: true,
       status: 200,
       json: async () => ({ embedding: { values: [1, 2, 3] } }),
-    })) as unknown as typeof fetch;
-    vi.stubGlobal("fetch", fetchMock);
+    }));
+    vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
 
     const { createEmbeddingProvider } = await import("./embeddings.js");
     const authModule = await import("../agents/model-auth.js");
@@ -157,7 +255,8 @@ describe("embedding provider remote overrides", () => {
 
     await result.provider.embedQuery("hello");
 
-    const [url, init] = fetchMock.mock.calls[0] ?? [];
+    const url = fetchMock.mock.calls[0]?.[0] as string | undefined;
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit | undefined;
     expect(url).toBe(
       "https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent",
     );
@@ -196,12 +295,12 @@ describe("embedding provider auto selection", () => {
   });
 
   it("uses gemini when openai is missing", async () => {
-    const fetchMock = vi.fn(async () => ({
+    const fetchMock = vi.fn(async (_input: unknown, _init?: unknown) => ({
       ok: true,
       status: 200,
       json: async () => ({ embedding: { values: [1, 2, 3] } }),
-    })) as unknown as typeof fetch;
-    vi.stubGlobal("fetch", fetchMock);
+    }));
+    vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
 
     const { createEmbeddingProvider } = await import("./embeddings.js");
     const authModule = await import("../agents/model-auth.js");
@@ -232,12 +331,12 @@ describe("embedding provider auto selection", () => {
   });
 
   it("keeps explicit model when openai is selected", async () => {
-    const fetchMock = vi.fn(async () => ({
+    const fetchMock = vi.fn(async (_input: unknown, _init?: unknown) => ({
       ok: true,
       status: 200,
       json: async () => ({ data: [{ embedding: [1, 2, 3] }] }),
-    })) as unknown as typeof fetch;
-    vi.stubGlobal("fetch", fetchMock);
+    }));
+    vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
 
     const { createEmbeddingProvider } = await import("./embeddings.js");
     const authModule = await import("../agents/model-auth.js");
@@ -258,9 +357,11 @@ describe("embedding provider auto selection", () => {
     expect(result.requestedProvider).toBe("auto");
     expect(result.provider.id).toBe("openai");
     await result.provider.embedQuery("hello");
-    const [url, init] = fetchMock.mock.calls[0] ?? [];
+    const url = fetchMock.mock.calls[0]?.[0] as string | undefined;
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit | undefined;
     expect(url).toBe("https://api.openai.com/v1/embeddings");
-    const payload = JSON.parse(String(init?.body ?? "{}")) as { model?: string };
+    const body = init?.body;
+    const payload = JSON.parse(typeof body === "string" ? body : "{}") as { model?: string };
     expect(payload.model).toBe("text-embedding-3-small");
   });
 });
@@ -283,7 +384,7 @@ describe("embedding provider local fallback", () => {
     }));
 
     const fetchMock = createFetchMock();
-    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
 
     const { createEmbeddingProvider } = await import("./embeddings.js");
     const authModule = await import("../agents/model-auth.js");

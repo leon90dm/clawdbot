@@ -7,7 +7,7 @@ const env = { ...process.env };
 const cwd = process.cwd();
 const compilerOverride = env.OPENCLAW_TS_COMPILER ?? env.CLAWDBOT_TS_COMPILER;
 const compiler = compilerOverride === "tsc" ? "tsc" : "tsgo";
-const projectArgs = ["--project", "tsconfig.json"];
+const projectArgs = ["--project", "tsconfig.json", "--noEmit", "false"];
 
 const initialBuild = spawnSync("pnpm", ["exec", compiler, ...projectArgs], {
   cwd,

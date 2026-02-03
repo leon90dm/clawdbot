@@ -9,7 +9,7 @@ export type ResolvedMemorySearchConfig = {
   enabled: boolean;
   sources: Array<"memory" | "sessions">;
   extraPaths: string[];
-  provider: "openai" | "local" | "gemini" | "auto";
+  provider: "openai" | "local" | "gemini" | "ollama" | "auto";
   remote?: {
     baseUrl?: string;
     apiKey?: string;
@@ -72,8 +72,11 @@ export type ResolvedMemorySearchConfig = {
 
 const DEFAULT_OPENAI_MODEL = "text-embedding-3-small";
 const DEFAULT_GEMINI_MODEL = "gemini-embedding-001";
+const DEFAULT_OLLAMA_MODEL = "nomic-embed-text";
 const DEFAULT_CHUNK_TOKENS = 400;
 const DEFAULT_CHUNK_OVERLAP = 80;
+const DEFAULT_OLLAMA_CHUNK_TOKENS = 200;
+const DEFAULT_OLLAMA_CHUNK_OVERLAP = 40;
 const DEFAULT_WATCH_DEBOUNCE_MS = 1500;
 const DEFAULT_SESSION_DELTA_BYTES = 100_000;
 const DEFAULT_SESSION_DELTA_MESSAGES = 50;
@@ -136,7 +139,11 @@ function mergeConfig(
     defaultRemote?.headers,
   );
   const includeRemote =
-    hasRemoteConfig || provider === "openai" || provider === "gemini" || provider === "auto";
+    hasRemoteConfig ||
+    provider === "openai" ||
+    provider === "gemini" ||
+    provider === "ollama" ||
+    provider === "auto";
   const batch = {
     enabled: overrideRemote?.batch?.enabled ?? defaultRemote?.batch?.enabled ?? true,
     wait: overrideRemote?.batch?.wait ?? defaultRemote?.batch?.wait ?? true,
@@ -163,7 +170,9 @@ function mergeConfig(
       ? DEFAULT_GEMINI_MODEL
       : provider === "openai"
         ? DEFAULT_OPENAI_MODEL
-        : undefined;
+        : provider === "ollama"
+          ? DEFAULT_OLLAMA_MODEL
+          : undefined;
   const model = overrides?.model ?? defaults?.model ?? modelDefault ?? "";
   const local = {
     modelPath: overrides?.local?.modelPath ?? defaults?.local?.modelPath,
@@ -184,9 +193,13 @@ function mergeConfig(
     path: resolveStorePath(agentId, overrides?.store?.path ?? defaults?.store?.path),
     vector,
   };
+  const chunkTokensDefault =
+    provider === "ollama" ? DEFAULT_OLLAMA_CHUNK_TOKENS : DEFAULT_CHUNK_TOKENS;
+  const chunkOverlapDefault =
+    provider === "ollama" ? DEFAULT_OLLAMA_CHUNK_OVERLAP : DEFAULT_CHUNK_OVERLAP;
   const chunking = {
-    tokens: overrides?.chunking?.tokens ?? defaults?.chunking?.tokens ?? DEFAULT_CHUNK_TOKENS,
-    overlap: overrides?.chunking?.overlap ?? defaults?.chunking?.overlap ?? DEFAULT_CHUNK_OVERLAP,
+    tokens: overrides?.chunking?.tokens ?? defaults?.chunking?.tokens ?? chunkTokensDefault,
+    overlap: overrides?.chunking?.overlap ?? defaults?.chunking?.overlap ?? chunkOverlapDefault,
   };
   const sync = {
     onSessionStart: overrides?.sync?.onSessionStart ?? defaults?.sync?.onSessionStart ?? true,

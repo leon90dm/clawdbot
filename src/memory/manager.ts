@@ -97,11 +97,6 @@ const SESSION_DIRTY_DEBOUNCE_MS = 5000;
 const EMBEDDING_BATCH_MAX_TOKENS = 8000;
 const EMBEDDING_APPROX_CHARS_PER_TOKEN = 1;
 const EMBEDDING_INDEX_CONCURRENCY = 4;
-const EMBEDDING_RETRY_MAX_ATTEMPTS = 3;
-const EMBEDDING_RETRY_REMOTE_MAX_ATTEMPTS = 8;
-const EMBEDDING_RETRY_BASE_DELAY_MS = 500;
-const EMBEDDING_RETRY_MAX_DELAY_MS = 8000;
-const EMBEDDING_RETRY_REMOTE_MAX_DELAY_MS = 60_000;
 const BATCH_FAILURE_LIMIT = 2;
 const SESSION_DELTA_READ_CHUNK_BYTES = 64 * 1024;
 const VECTOR_LOAD_TIMEOUT_MS = 30_000;
@@ -109,6 +104,7 @@ const EMBEDDING_QUERY_TIMEOUT_REMOTE_MS = 60_000;
 const EMBEDDING_QUERY_TIMEOUT_LOCAL_MS = 5 * 60_000;
 const EMBEDDING_BATCH_TIMEOUT_REMOTE_MS = 2 * 60_000;
 const EMBEDDING_BATCH_TIMEOUT_LOCAL_MS = 10 * 60_000;
+const OLLAMA_EMBEDDING_MAX_CHARS = 800;
 
 const log = createSubsystemLogger("memory");
 
@@ -124,8 +120,8 @@ export class MemoryIndexManager {
   private readonly workspaceDir: string;
   private readonly settings: ResolvedMemorySearchConfig;
   private provider: EmbeddingProvider;
-  private readonly requestedProvider: "openai" | "local" | "gemini" | "auto";
-  private fallbackFrom?: "openai" | "local" | "gemini";
+  private readonly requestedProvider: EmbeddingProviderResult["requestedProvider"];
+  private fallbackFrom?: EmbeddingProviderResult["fallbackFrom"];
   private fallbackReason?: string;
   private openAi?: OpenAiEmbeddingClient;
   private gemini?: GeminiEmbeddingClient;
@@ -1435,7 +1431,10 @@ export class MemoryIndexManager {
     if (this.fallbackFrom) {
       return false;
     }
-    const fallbackFrom = this.provider.id as "openai" | "gemini" | "local";
+    const fallbackFrom = this.provider.id as Exclude<
+      NonNullable<EmbeddingProviderResult["fallbackFrom"]>,
+      undefined
+    >;
 
     const fallbackModel =
       fallback === "gemini"
@@ -1905,6 +1904,20 @@ export class MemoryIndexManager {
         }),
       );
     }
+    if (this.provider.id === "ollama" && this.openAi) {
+      const entries = Object.entries(this.openAi.headers)
+        .filter(([key]) => key.toLowerCase() !== "authorization")
+        .toSorted(([a], [b]) => a.localeCompare(b))
+        .map(([key, value]) => [key, value]);
+      return hashText(
+        JSON.stringify({
+          provider: "ollama",
+          baseUrl: this.openAi.baseUrl,
+          model: this.openAi.model,
+          headers: entries,
+        }),
+      );
+    }
     if (this.provider.id === "gemini" && this.gemini) {
       const entries = Object.entries(this.gemini.headers)
         .filter(([key]) => {
@@ -2102,54 +2115,27 @@ export class MemoryIndexManager {
     if (texts.length === 0) {
       return [];
     }
-    const maxAttempts =
-      this.provider.id === "local"
-        ? EMBEDDING_RETRY_MAX_ATTEMPTS
-        : EMBEDDING_RETRY_REMOTE_MAX_ATTEMPTS;
-    const maxDelayMs =
-      this.provider.id === "local"
-        ? EMBEDDING_RETRY_MAX_DELAY_MS
-        : EMBEDDING_RETRY_REMOTE_MAX_DELAY_MS;
-    let attempt = 0;
-    let delayMs = EMBEDDING_RETRY_BASE_DELAY_MS;
-    while (true) {
-      try {
-        const timeoutMs = this.resolveEmbeddingTimeout("batch");
-        log.debug("memory embeddings: batch start", {
-          provider: this.provider.id,
-          items: texts.length,
-          timeoutMs,
-        });
-        return await this.withTimeout(
-          this.provider.embedBatch(texts),
-          timeoutMs,
-          `memory embeddings batch timed out after ${Math.round(timeoutMs / 1000)}s`,
-        );
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        if (!this.isRetryableEmbeddingError(message) || attempt >= maxAttempts) {
-          throw err;
-        }
-        const waitMs = Math.min(maxDelayMs, Math.round(delayMs * (1 + Math.random() * 0.2)));
-        log.warn(`memory embeddings failed; retrying in ${waitMs}ms`);
-        await new Promise((resolve) => setTimeout(resolve, waitMs));
-        delayMs *= 2;
-        attempt += 1;
-      }
-    }
+    const timeoutMs = this.resolveEmbeddingTimeout("batch");
+    log.debug("memory embeddings: batch start", {
+      provider: this.provider.id,
+      items: texts.length,
+      timeoutMs,
+    });
+    return await this.withTimeout(
+      this.provider.embedBatch(texts.map((text) => this.normalizeEmbeddingInput(text))),
+      timeoutMs,
+      `memory embeddings batch timed out after ${Math.round(timeoutMs / 1000)}s`,
+    );
   }
 
-  private isRetryableEmbeddingError(message: string): boolean {
-    if (
-      /(insufficient_quota|invalid[_ ]api[_ ]key|invalid api key|no api key|api[_ ]key.*(missing|invalid))/i.test(
-        message,
-      )
-    ) {
-      return false;
+  private normalizeEmbeddingInput(text: string): string {
+    if (this.provider.id !== "ollama") {
+      return text;
     }
-    return /(rate[_ ]limit|too many requests|429|resource has been exhausted|5\d\d|cloudflare|eof|econnreset|etimedout|econnrefused|socket hang up|fetch failed|network)/i.test(
-      message,
-    );
+    if (text.length <= OLLAMA_EMBEDDING_MAX_CHARS) {
+      return text;
+    }
+    return text.slice(0, OLLAMA_EMBEDDING_MAX_CHARS);
   }
 
   private resolveEmbeddingTimeout(kind: "query" | "batch"): number {
@@ -2165,38 +2151,14 @@ export class MemoryIndexManager {
     if (!cleaned) {
       return [];
     }
-    const maxAttempts =
-      this.provider.id === "local"
-        ? EMBEDDING_RETRY_MAX_ATTEMPTS
-        : EMBEDDING_RETRY_REMOTE_MAX_ATTEMPTS;
-    const maxDelayMs =
-      this.provider.id === "local"
-        ? EMBEDDING_RETRY_MAX_DELAY_MS
-        : EMBEDDING_RETRY_REMOTE_MAX_DELAY_MS;
-    let attempt = 0;
-    let delayMs = EMBEDDING_RETRY_BASE_DELAY_MS;
-    while (true) {
-      try {
-        return await this.embedQueryWithTimeout(cleaned);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        if (!this.isRetryableEmbeddingError(message) || attempt >= maxAttempts) {
-          throw err;
-        }
-        const waitMs = Math.min(maxDelayMs, Math.round(delayMs * (1 + Math.random() * 0.2)));
-        log.warn(`memory embeddings failed; retrying in ${waitMs}ms`);
-        await new Promise((resolve) => setTimeout(resolve, waitMs));
-        delayMs *= 2;
-        attempt += 1;
-      }
-    }
+    return await this.embedQueryWithTimeout(cleaned);
   }
 
   private async embedQueryWithTimeout(text: string): Promise<number[]> {
     const timeoutMs = this.resolveEmbeddingTimeout("query");
     log.debug("memory embeddings: query start", { provider: this.provider.id, timeoutMs });
     return await this.withTimeout(
-      this.provider.embedQuery(text),
+      this.provider.embedQuery(this.normalizeEmbeddingInput(text)),
       timeoutMs,
       `memory embeddings query timed out after ${Math.round(timeoutMs / 1000)}s`,
     );
@@ -2315,21 +2277,7 @@ export class MemoryIndexManager {
     provider: string;
     run: () => Promise<T>;
   }): Promise<T> {
-    try {
-      return await params.run();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (this.isBatchTimeoutError(message)) {
-        log.warn(`memory embeddings: ${params.provider} batch timed out; retrying once`);
-        try {
-          return await params.run();
-        } catch (retryErr) {
-          (retryErr as { batchAttempts?: number }).batchAttempts = 2;
-          throw retryErr;
-        }
-      }
-      throw err;
-    }
+    return await params.run();
   }
 
   private async runBatchWithFallback<T>(params: {

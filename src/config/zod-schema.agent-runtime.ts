@@ -316,7 +316,15 @@ export const MemorySearchSchema = z
       })
       .strict()
       .optional(),
-    provider: z.union([z.literal("openai"), z.literal("local"), z.literal("gemini")]).optional(),
+    provider: z
+      .union([
+        z.literal("openai"),
+        z.literal("local"),
+        z.literal("gemini"),
+        z.literal("ollama"),
+        z.literal("auto"),
+      ])
+      .optional(),
     remote: z
       .object({
         baseUrl: z.string().optional(),

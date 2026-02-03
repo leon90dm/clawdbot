@@ -153,7 +153,7 @@ describe("memory embedding batches", () => {
     expect(last?.completed).toBe(last?.total);
   });
 
-  it("retries embeddings on rate limit errors", async () => {
+  it("does not retry embeddings on rate limit errors", async () => {
     const line = "d".repeat(120);
     const content = Array.from({ length: 4 }, () => line).join("\n");
     await fs.writeFile(path.join(workspaceDir, "memory", "2026-01-06.md"), content);
@@ -167,19 +167,6 @@ describe("memory embedding batches", () => {
       return texts.map(() => [0, 1, 0]);
     });
 
-    const realSetTimeout = setTimeout;
-    const setTimeoutSpy = vi.spyOn(global, "setTimeout").mockImplementation(((
-      handler: TimerHandler,
-      timeout?: number,
-      ...args: unknown[]
-    ) => {
-      const delay = typeof timeout === "number" ? timeout : 0;
-      if (delay > 0 && delay <= 2000) {
-        return realSetTimeout(handler, 0, ...args);
-      }
-      return realSetTimeout(handler, delay, ...args);
-    }) as typeof setTimeout);
-
     const cfg: OpenClawConfig = {
       agents: {
         defaults: {
@@ -203,16 +190,12 @@ describe("memory embedding batches", () => {
       throw new Error("manager missing");
     }
     manager = result.manager;
-    try {
-      await manager.sync({ force: true });
-    } finally {
-      setTimeoutSpy.mockRestore();
-    }
+    await expect(manager.sync({ force: true })).rejects.toThrow(/429/i);
 
-    expect(calls).toBe(3);
+    expect(calls).toBe(1);
   }, 10000);
 
-  it("retries embeddings on transient 5xx errors", async () => {
+  it("does not retry embeddings on transient 5xx errors", async () => {
     const line = "e".repeat(120);
     const content = Array.from({ length: 4 }, () => line).join("\n");
     await fs.writeFile(path.join(workspaceDir, "memory", "2026-01-08.md"), content);
@@ -226,19 +209,6 @@ describe("memory embedding batches", () => {
       return texts.map(() => [0, 1, 0]);
     });
 
-    const realSetTimeout = setTimeout;
-    const setTimeoutSpy = vi.spyOn(global, "setTimeout").mockImplementation(((
-      handler: TimerHandler,
-      timeout?: number,
-      ...args: unknown[]
-    ) => {
-      const delay = typeof timeout === "number" ? timeout : 0;
-      if (delay > 0 && delay <= 2000) {
-        return realSetTimeout(handler, 0, ...args);
-      }
-      return realSetTimeout(handler, delay, ...args);
-    }) as typeof setTimeout);
-
     const cfg: OpenClawConfig = {
       agents: {
         defaults: {
@@ -262,16 +232,12 @@ describe("memory embedding batches", () => {
       throw new Error("manager missing");
     }
     manager = result.manager;
-    try {
-      await manager.sync({ force: true });
-    } finally {
-      setTimeoutSpy.mockRestore();
-    }
+    await expect(manager.sync({ force: true })).rejects.toThrow(/502/i);
 
-    expect(calls).toBe(3);
+    expect(calls).toBe(1);
   }, 10000);
 
-  it("retries embeddings on transient network EOF errors", async () => {
+  it("does not retry embeddings on transient network EOF errors", async () => {
     const line = "f".repeat(120);
     const content = Array.from({ length: 4 }, () => line).join("\n");
     await fs.writeFile(path.join(workspaceDir, "memory", "2026-01-09.md"), content);
@@ -287,19 +253,6 @@ describe("memory embedding batches", () => {
       return texts.map(() => [0, 1, 0]);
     });
 
-    const realSetTimeout = setTimeout;
-    const setTimeoutSpy = vi.spyOn(global, "setTimeout").mockImplementation(((
-      handler: TimerHandler,
-      timeout?: number,
-      ...args: unknown[]
-    ) => {
-      const delay = typeof timeout === "number" ? timeout : 0;
-      if (delay > 0 && delay <= 2000) {
-        return realSetTimeout(handler, 0, ...args);
-      }
-      return realSetTimeout(handler, delay, ...args);
-    }) as typeof setTimeout);
-
     const cfg: OpenClawConfig = {
       agents: {
         defaults: {
@@ -323,13 +276,9 @@ describe("memory embedding batches", () => {
       throw new Error("manager missing");
     }
     manager = result.manager;
-    try {
-      await manager.sync({ force: true });
-    } finally {
-      setTimeoutSpy.mockRestore();
-    }
+    await expect(manager.sync({ force: true })).rejects.toThrow(/EOF/i);
 
-    expect(calls).toBe(3);
+    expect(calls).toBe(1);
   }, 10000);
 
   it("skips empty chunks so embeddings input stays valid", async () => {

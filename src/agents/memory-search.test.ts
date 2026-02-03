@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { OpenClawConfig } from "../config/config.js";
 import { resolveMemorySearchConfig } from "./memory-search.js";
 
 describe("memory search config", () => {
@@ -16,7 +17,7 @@ describe("memory search config", () => {
           },
         ],
       },
-    };
+    } satisfies OpenClawConfig;
     const resolved = resolveMemorySearchConfig(cfg, "main");
     expect(resolved).toBeNull();
   });
@@ -30,7 +31,7 @@ describe("memory search config", () => {
           },
         },
       },
-    };
+    } satisfies OpenClawConfig;
     const resolved = resolveMemorySearchConfig(cfg, "main");
     expect(resolved?.provider).toBe("auto");
     expect(resolved?.fallback).toBe("none");
@@ -69,7 +70,7 @@ describe("memory search config", () => {
           },
         ],
       },
-    };
+    } satisfies OpenClawConfig;
     const resolved = resolveMemorySearchConfig(cfg, "main");
     expect(resolved?.provider).toBe("openai");
     expect(resolved?.model).toBe("text-embedding-3-small");
@@ -99,7 +100,7 @@ describe("memory search config", () => {
           },
         ],
       },
-    };
+    } satisfies OpenClawConfig;
     const resolved = resolveMemorySearchConfig(cfg, "main");
     expect(resolved?.extraPaths).toEqual(["/shared/notes", "docs", "../team-notes"]);
   });
@@ -113,7 +114,7 @@ describe("memory search config", () => {
           },
         },
       },
-    };
+    } satisfies OpenClawConfig;
     const resolved = resolveMemorySearchConfig(cfg, "main");
     expect(resolved?.remote?.batch).toEqual({
       enabled: true,
@@ -133,7 +134,7 @@ describe("memory search config", () => {
           },
         },
       },
-    };
+    } satisfies OpenClawConfig;
     const resolved = resolveMemorySearchConfig(cfg, "main");
     expect(resolved?.remote).toBeUndefined();
   });
@@ -147,7 +148,7 @@ describe("memory search config", () => {
           },
         },
       },
-    };
+    } satisfies OpenClawConfig;
     const resolved = resolveMemorySearchConfig(cfg, "main");
     expect(resolved?.remote?.batch).toEqual({
       enabled: true,
@@ -156,6 +157,27 @@ describe("memory search config", () => {
       pollIntervalMs: 2000,
       timeoutMinutes: 60,
     });
+  });
+
+  it("includes remote defaults and model default for ollama without overrides", () => {
+    const cfg = {
+      agents: {
+        defaults: {
+          memorySearch: {
+            provider: "ollama",
+          },
+        },
+      },
+    } satisfies OpenClawConfig;
+    const resolved = resolveMemorySearchConfig(cfg, "main");
+    expect(resolved?.remote?.batch).toEqual({
+      enabled: true,
+      wait: true,
+      concurrency: 2,
+      pollIntervalMs: 2000,
+      timeoutMinutes: 60,
+    });
+    expect(resolved?.model).toBe("nomic-embed-text");
   });
 
   it("defaults session delta thresholds", () => {
@@ -167,7 +189,7 @@ describe("memory search config", () => {
           },
         },
       },
-    };
+    } satisfies OpenClawConfig;
     const resolved = resolveMemorySearchConfig(cfg, "main");
     expect(resolved?.sync.sessions).toEqual({
       deltaBytes: 100000,
@@ -200,7 +222,7 @@ describe("memory search config", () => {
           },
         ],
       },
-    };
+    } satisfies OpenClawConfig;
     const resolved = resolveMemorySearchConfig(cfg, "main");
     expect(resolved?.remote).toEqual({
       baseUrl: "https://agent.example/v1",
@@ -235,7 +257,7 @@ describe("memory search config", () => {
           },
         ],
       },
-    };
+    } satisfies OpenClawConfig;
     const resolved = resolveMemorySearchConfig(cfg, "main");
     expect(resolved?.sources).toEqual(["memory"]);
   });
@@ -251,7 +273,7 @@ describe("memory search config", () => {
           },
         },
       },
-    };
+    } satisfies OpenClawConfig;
     const resolved = resolveMemorySearchConfig(cfg, "main");
     expect(resolved?.sources).toContain("sessions");
   });
