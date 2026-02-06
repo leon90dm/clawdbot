@@ -1,6 +1,6 @@
 import type { AssistantMessage } from "@mariozechner/pi-ai";
 import type { OpenClawConfig } from "../../config/config.js";
-import { extractAssistantText } from "../pi-embedded-utils.js";
+import { extractAssistantText, extractAssistantThinking } from "../pi-embedded-utils.js";
 
 export type ImageModelConfig = { primary?: string; fallbacks?: string[] };
 
@@ -47,7 +47,20 @@ export function coerceImageAssistantText(params: {
   if (text.trim()) {
     return text.trim();
   }
-  throw new Error(`Image model returned no text (${params.provider}/${params.model}).`);
+
+  const thinking = extractAssistantThinking(params.message);
+  const debugContent = JSON.stringify(params.message.content).slice(0, 500);
+  const stopReason = params.message.stopReason;
+
+  if (thinking.trim()) {
+    throw new Error(
+      `Image model returned no text (only thinking, stop: ${stopReason}) (${params.provider}/${params.model}). Content: ${debugContent}`,
+    );
+  }
+
+  throw new Error(
+    `Image model returned no text (stop: ${stopReason}) (${params.provider}/${params.model}). This may be due to a proxy issue stripping content, or the model hitting a safety filter silently. Content: ${debugContent}`,
+  );
 }
 
 export function coerceImageModelConfig(cfg?: OpenClawConfig): ImageModelConfig {

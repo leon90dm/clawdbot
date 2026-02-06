@@ -55,7 +55,8 @@ export async function describeImageWithModel(
   };
   const message = await complete(model, context, {
     apiKey,
-    maxTokens: params.maxTokens ?? 512,
+    maxTokens: params.maxTokens ?? 8192,
+    reasoning: "off",
   });
   const text = coerceImageAssistantText({
     message,
