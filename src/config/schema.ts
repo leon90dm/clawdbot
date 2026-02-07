@@ -543,7 +543,7 @@ const FIELD_HELP: Record<string, string> = {
   "agents.defaults.memorySearch.experimental.sessionMemory":
     "Enable experimental session transcript indexing for memory search (default: false).",
   "agents.defaults.memorySearch.provider":
-    'Embedding provider ("openai", "gemini", "ollama", "local", or "auto").',
+    'Embedding provider ("openai", "gemini", "ollama", "voyage", "local", or "auto").',
   "agents.defaults.memorySearch.remote.baseUrl":
     "Custom base URL for remote embeddings (OpenAI-compatible proxies or Gemini overrides).",
   "agents.defaults.memorySearch.remote.apiKey": "Custom API key for the remote embedding provider.",

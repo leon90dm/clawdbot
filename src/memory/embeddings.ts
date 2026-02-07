@@ -8,6 +8,7 @@ import {
   createOpenAiEmbeddingProvider,
   type OpenAiEmbeddingClient,
 } from "./embeddings-openai.js";
+import { createVoyageEmbeddingProvider, type VoyageEmbeddingClient } from "./embeddings-voyage.js";
 import { importNodeLlamaCpp } from "./node-llama.js";
 
 function sanitizeAndNormalizeEmbedding(vec: number[]): number[] {
@@ -21,6 +22,7 @@ function sanitizeAndNormalizeEmbedding(vec: number[]): number[] {
 
 export type { GeminiEmbeddingClient } from "./embeddings-gemini.js";
 export type { OpenAiEmbeddingClient } from "./embeddings-openai.js";
+export type { VoyageEmbeddingClient } from "./embeddings-voyage.js";
 
 export type EmbeddingProvider = {
   id: string;
@@ -31,24 +33,25 @@ export type EmbeddingProvider = {
 
 export type EmbeddingProviderResult = {
   provider: EmbeddingProvider;
-  requestedProvider: "openai" | "local" | "gemini" | "ollama" | "auto";
-  fallbackFrom?: "openai" | "local" | "gemini" | "ollama";
+  requestedProvider: "openai" | "local" | "gemini" | "ollama" | "voyage" | "auto";
+  fallbackFrom?: "openai" | "local" | "gemini" | "ollama" | "voyage";
   fallbackReason?: string;
   openAi?: OpenAiEmbeddingClient;
   gemini?: GeminiEmbeddingClient;
+  voyage?: VoyageEmbeddingClient;
 };
 
 export type EmbeddingProviderOptions = {
   config: OpenClawConfig;
   agentDir?: string;
-  provider: "openai" | "local" | "gemini" | "ollama" | "auto";
+  provider: "openai" | "local" | "gemini" | "ollama" | "voyage" | "auto";
   remote?: {
     baseUrl?: string;
     apiKey?: string;
     headers?: Record<string, string>;
   };
   model: string;
-  fallback: "openai" | "gemini" | "local" | "none";
+  fallback: "openai" | "gemini" | "local" | "voyage" | "none";
   local?: {
     modelPath?: string;
     modelCacheDir?: string;
@@ -132,7 +135,7 @@ export async function createEmbeddingProvider(
   const requestedProvider = options.provider;
   const fallback = options.fallback;
 
-  const createProvider = async (id: "openai" | "local" | "gemini" | "ollama") => {
+  const createProvider = async (id: "openai" | "local" | "gemini" | "ollama" | "voyage") => {
     if (id === "local") {
       const provider = await createLocalEmbeddingProvider(options);
       return { provider };
@@ -145,12 +148,18 @@ export async function createEmbeddingProvider(
       const { provider, client } = await createOllamaEmbeddingProvider(options);
       return { provider, openAi: client };
     }
+    if (id === "voyage") {
+      const { provider, client } = await createVoyageEmbeddingProvider(options);
+      return { provider, voyage: client };
+    }
     const { provider, client } = await createOpenAiEmbeddingProvider(options);
     return { provider, openAi: client };
   };
 
-  const formatPrimaryError = (err: unknown, provider: "openai" | "local" | "gemini" | "ollama") =>
-    provider === "local" ? formatLocalSetupError(err) : formatError(err);
+  const formatPrimaryError = (
+    err: unknown,
+    provider: "openai" | "local" | "gemini" | "ollama" | "voyage",
+  ) => (provider === "local" ? formatLocalSetupError(err) : formatError(err));
 
   if (requestedProvider === "auto") {
     const missingKeyErrors: string[] = [];
@@ -165,7 +174,7 @@ export async function createEmbeddingProvider(
       }
     }
 
-    for (const provider of ["openai", "gemini"] as const) {
+    for (const provider of ["openai", "gemini", "voyage"] as const) {
       try {
         const result = await createProvider(provider);
         return { ...result, requestedProvider };
@@ -248,6 +257,7 @@ function formatLocalSetupError(err: unknown): string {
       : null,
     "3) If you use pnpm: pnpm approve-builds (select node-llama-cpp), then pnpm rebuild node-llama-cpp",
     'Or set agents.defaults.memorySearch.provider = "openai" (remote).',
+    'Or set agents.defaults.memorySearch.provider = "voyage" (remote).',
   ]
     .filter(Boolean)
     .join("\n");
