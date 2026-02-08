@@ -145,7 +145,7 @@ function classifyKey(key: string, entry?: SessionEntry): SessionRow["kind"] {
   if (key === "unknown") {
     return "unknown";
   }
-  if (key.startsWith("archive:")) {
+  if (key.startsWith("archive:") || key.includes(":archive:")) {
     return "archive";
   }
   if (entry?.chatType === "group" || entry?.chatType === "channel") {

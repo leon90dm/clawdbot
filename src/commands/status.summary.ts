@@ -23,6 +23,9 @@ const classifyKey = (key: string, entry?: SessionEntry): SessionStatus["kind"] =
   if (key === "unknown") {
     return "unknown";
   }
+  if (key.startsWith("archive:") || key.includes(":archive:")) {
+    return "archive";
+  }
   if (entry?.chatType === "group" || entry?.chatType === "channel") {
     return "group";
   }

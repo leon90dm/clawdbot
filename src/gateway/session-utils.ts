@@ -198,6 +198,9 @@ export function classifySessionKey(key: string, entry?: SessionEntry): GatewaySe
   if (key === "unknown") {
     return "unknown";
   }
+  if (key.startsWith("archive:") || key.includes(":archive:")) {
+    return "archive";
+  }
   if (entry?.chatType === "group" || entry?.chatType === "channel") {
     return "group";
   }

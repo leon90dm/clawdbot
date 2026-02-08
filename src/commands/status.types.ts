@@ -3,7 +3,7 @@ import type { ChannelId } from "../channels/plugins/types.js";
 export type SessionStatus = {
   agentId?: string;
   key: string;
-  kind: "direct" | "group" | "global" | "unknown";
+  kind: "direct" | "group" | "global" | "unknown" | "archive";
   sessionId?: string;
   updatedAt: number | null;
   age: number | null;
