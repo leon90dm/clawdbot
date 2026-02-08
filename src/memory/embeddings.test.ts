@@ -217,6 +217,51 @@ describe("embedding provider remote overrides", () => {
     expect(fetchMock.mock.calls[3]?.[0]).toBe("http://ollama.example:11434/api/embed");
   });
 
+  it("retries transient Ollama failures on the OpenAI-compatible endpoint", async () => {
+    let attempts = 0;
+    const fetchMock = vi.fn(async (input: unknown) => {
+      const url = String(input);
+      if (url !== "http://ollama.example:11434/v1/embeddings") {
+        throw new Error(`Unexpected url ${url}`);
+      }
+      attempts += 1;
+      if (attempts === 1) {
+        return {
+          ok: false,
+          status: 500,
+          text: async () =>
+            JSON.stringify({
+              error: {
+                message: 'do embedding request: Post "http://127.0.0.1:21971/embedding": EOF',
+              },
+            }),
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ data: [{ embedding: [1, 2, 3] }] }),
+      };
+    });
+    vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
+
+    const { createEmbeddingProvider } = await import("./embeddings.js");
+    const result = await createEmbeddingProvider({
+      config: {} as never,
+      provider: "ollama",
+      remote: {
+        baseUrl: "http://ollama.example:11434",
+      },
+      model: "nomic-embed-text",
+      fallback: "none",
+    });
+
+    await expect(result.provider.embedQuery("hello")).resolves.toEqual([1, 2, 3]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("http://ollama.example:11434/v1/embeddings");
+    expect(fetchMock.mock.calls[1]?.[0]).toBe("http://ollama.example:11434/v1/embeddings");
+  });
+
   it("builds Gemini embeddings requests with api key header", async () => {
     const fetchMock = vi.fn(async (_input: unknown, _init?: unknown) => ({
       ok: true,

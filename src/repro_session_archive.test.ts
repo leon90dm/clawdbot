@@ -2,8 +2,10 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import type { MsgContext } from "./auto-reply/templating.js";
+import type { OpenClawConfig } from "./config/config.js";
 import { initSessionState } from "./auto-reply/reply/session.js";
-import { saveSessionStore } from "./config/sessions.js";
+import { saveSessionStore, type SessionEntry } from "./config/sessions.js";
 
 describe("initSessionState archiving", () => {
   let tmpDir: string;
@@ -21,7 +23,7 @@ describe("initSessionState archiving", () => {
   it("should archive previous session when /new is used", async () => {
     // 1. Setup initial session
     const sessionKey = "agent:main:main";
-    const initialStore = {
+    const initialStore: Record<string, SessionEntry> = {
       [sessionKey]: {
         sessionId: "old-session-id",
         updatedAt: Date.now(),
@@ -31,21 +33,22 @@ describe("initSessionState archiving", () => {
     await saveSessionStore(storePath, initialStore);
 
     // 2. Call initSessionState with /new
-    const ctx = {
+    const ctx: MsgContext = {
       Body: "/new",
       SessionKey: sessionKey,
       From: "user",
       ChatType: "direct",
-    } as any;
+    };
 
     const cfg = {
       session: {
         store: storePath,
       },
-      agent: {
-        id: "main",
+      agents: {
+        defaults: {},
+        list: [{ id: "main", default: true }],
       },
-    } as any;
+    } satisfies OpenClawConfig;
 
     const result = await initSessionState({
       ctx,

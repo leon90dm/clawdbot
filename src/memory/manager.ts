@@ -165,6 +165,9 @@ export class MemoryIndexManager implements MemorySearchManager {
   >();
   private sessionWarm = new Set<string>();
   private syncing: Promise<void> | null = null;
+  private syncFailureCount = 0;
+  private syncBackoffUntilMs = 0;
+  private syncLastFailureMessage?: string;
 
   static async get(params: {
     cfg: OpenClawConfig;
@@ -293,7 +296,15 @@ export class MemoryIndexManager implements MemorySearchManager {
       ? await this.searchKeyword(cleaned, candidates).catch(() => [])
       : [];
 
-    const queryVec = await this.embedQueryWithRetry(cleaned);
+    let queryVec: number[];
+    try {
+      queryVec = await this.embedQueryWithRetry(cleaned);
+    } catch (err) {
+      if (hybrid.enabled) {
+        return keywordResults.filter((entry) => entry.score >= minScore).slice(0, maxResults);
+      }
+      throw err;
+    }
     const hasVector = queryVec.some((v) => v !== 0);
     const vectorResults = hasVector
       ? await this.searchVector(queryVec, candidates).catch(() => [])
@@ -396,10 +407,67 @@ export class MemoryIndexManager implements MemorySearchManager {
     if (this.syncing) {
       return this.syncing;
     }
-    this.syncing = this.runSync(params).finally(() => {
+    if (this.shouldSkipBackgroundSync(params)) {
+      return;
+    }
+    this.syncing = this.runSyncWithBackoff(params).finally(() => {
       this.syncing = null;
     });
     return this.syncing;
+  }
+
+  private async runSyncWithBackoff(params?: {
+    reason?: string;
+    force?: boolean;
+    progress?: (update: MemorySyncProgressUpdate) => void;
+  }): Promise<void> {
+    const background = this.isBackgroundSyncReason(params?.reason);
+    try {
+      await this.runSync(params);
+      this.resetSyncFailures();
+    } catch (err) {
+      this.recordSyncFailure(err);
+      if (background && !params?.force) {
+        return;
+      }
+      throw err;
+    }
+  }
+
+  private isBackgroundSyncReason(reason?: string): boolean {
+    return (
+      reason === "session-start" ||
+      reason === "search" ||
+      reason === "watch" ||
+      reason === "interval"
+    );
+  }
+
+  private shouldSkipBackgroundSync(params?: { reason?: string; force?: boolean }): boolean {
+    if (params?.force) {
+      return false;
+    }
+    if (!this.isBackgroundSyncReason(params?.reason)) {
+      return false;
+    }
+    return Date.now() < this.syncBackoffUntilMs;
+  }
+
+  private resetSyncFailures(): void {
+    this.syncFailureCount = 0;
+    this.syncBackoffUntilMs = 0;
+    this.syncLastFailureMessage = undefined;
+  }
+
+  private recordSyncFailure(err: unknown): void {
+    const message = err instanceof Error ? err.message : String(err);
+    this.syncLastFailureMessage = message;
+    this.syncFailureCount += 1;
+    const baseDelayMs = 5000;
+    const maxDelayMs = 5 * 60_000;
+    const exp = Math.max(0, this.syncFailureCount - 1);
+    const delayMs = Math.min(maxDelayMs, baseDelayMs * 2 ** exp);
+    this.syncBackoffUntilMs = Date.now() + delayMs;
   }
 
   async readFile(params: {

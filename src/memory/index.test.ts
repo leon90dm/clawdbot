@@ -2,10 +2,12 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { OpenClawConfig } from "../config/config.js";
 import { getMemorySearchManager, type MemoryIndexManager } from "./index.js";
 
 let embedBatchCalls = 0;
 let failEmbeddings = false;
+let failQueryEmbeddings = false;
 
 vi.mock("./embeddings.js", () => {
   const embedText = (text: string) => {
@@ -20,7 +22,12 @@ vi.mock("./embeddings.js", () => {
       provider: {
         id: "mock",
         model: options.model ?? "mock-embed",
-        embedQuery: async (text: string) => embedText(text),
+        embedQuery: async (text: string) => {
+          if (failQueryEmbeddings) {
+            throw new Error("mock embeddings query failed");
+          }
+          return embedText(text);
+        },
         embedBatch: async (texts: string[]) => {
           embedBatchCalls += 1;
           if (failEmbeddings) {
@@ -41,6 +48,7 @@ describe("memory index", () => {
   beforeEach(async () => {
     embedBatchCalls = 0;
     failEmbeddings = false;
+    failQueryEmbeddings = false;
     workspaceDir = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-mem-"));
     indexPath = path.join(workspaceDir, "index.sqlite");
     await fs.mkdir(path.join(workspaceDir, "memory"));
@@ -74,18 +82,19 @@ describe("memory index", () => {
         },
         list: [{ id: "main", default: true }],
       },
-    };
+    } satisfies OpenClawConfig;
     const result = await getMemorySearchManager({ cfg, agentId: "main" });
     expect(result.manager).not.toBeNull();
     if (!result.manager) {
       throw new Error("manager missing");
     }
-    manager = result.manager;
-    await result.manager.sync({ force: true });
-    const results = await result.manager.search("alpha");
+    const mgr = result.manager as MemoryIndexManager;
+    manager = mgr;
+    await mgr.sync({ force: true });
+    const results = await mgr.search("alpha");
     expect(results.length).toBeGreaterThan(0);
     expect(results[0]?.path).toContain("memory/2026-01-12.md");
-    const status = result.manager.status();
+    const status = mgr.status();
     expect(status.sourceCounts).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -111,54 +120,58 @@ describe("memory index", () => {
         },
         list: [{ id: "main", default: true }],
       },
-    };
+    } satisfies OpenClawConfig;
 
-    const first = await getMemorySearchManager({
-      cfg: {
-        ...base,
-        agents: {
-          ...base.agents,
-          defaults: {
-            ...base.agents.defaults,
-            memorySearch: {
-              ...base.agents.defaults.memorySearch,
-              model: "mock-embed-v1",
-            },
+    const firstCfg = {
+      ...base,
+      agents: {
+        ...base.agents,
+        defaults: {
+          ...base.agents.defaults,
+          memorySearch: {
+            ...base.agents.defaults.memorySearch,
+            model: "mock-embed-v1",
           },
         },
       },
+    } satisfies OpenClawConfig;
+    const first = await getMemorySearchManager({
+      cfg: firstCfg,
       agentId: "main",
     });
     expect(first.manager).not.toBeNull();
     if (!first.manager) {
       throw new Error("manager missing");
     }
-    await first.manager.sync({ force: true });
-    await first.manager.close();
+    const firstMgr = first.manager as MemoryIndexManager;
+    await firstMgr.sync({ force: true });
+    await firstMgr.close();
 
-    const second = await getMemorySearchManager({
-      cfg: {
-        ...base,
-        agents: {
-          ...base.agents,
-          defaults: {
-            ...base.agents.defaults,
-            memorySearch: {
-              ...base.agents.defaults.memorySearch,
-              model: "mock-embed-v2",
-            },
+    const secondCfg = {
+      ...base,
+      agents: {
+        ...base.agents,
+        defaults: {
+          ...base.agents.defaults,
+          memorySearch: {
+            ...base.agents.defaults.memorySearch,
+            model: "mock-embed-v2",
           },
         },
       },
+    } satisfies OpenClawConfig;
+    const second = await getMemorySearchManager({
+      cfg: secondCfg,
       agentId: "main",
     });
     expect(second.manager).not.toBeNull();
     if (!second.manager) {
       throw new Error("manager missing");
     }
-    manager = second.manager;
-    await second.manager.sync({ reason: "test" });
-    const results = await second.manager.search("alpha");
+    const secondMgr = second.manager as MemoryIndexManager;
+    manager = secondMgr;
+    await secondMgr.sync({ reason: "test" });
+    const results = await secondMgr.search("alpha");
     expect(results.length).toBeGreaterThan(0);
   });
 
@@ -178,18 +191,19 @@ describe("memory index", () => {
         },
         list: [{ id: "main", default: true }],
       },
-    };
+    } satisfies OpenClawConfig;
     const result = await getMemorySearchManager({ cfg, agentId: "main" });
     expect(result.manager).not.toBeNull();
     if (!result.manager) {
       throw new Error("manager missing");
     }
-    manager = result.manager;
-    await manager.sync({ force: true });
+    const mgr = result.manager as MemoryIndexManager;
+    manager = mgr;
+    await mgr.sync({ force: true });
     const afterFirst = embedBatchCalls;
     expect(afterFirst).toBeGreaterThan(0);
 
-    await manager.sync({ force: true });
+    await mgr.sync({ force: true });
     expect(embedBatchCalls).toBe(afterFirst);
   });
 
@@ -209,22 +223,23 @@ describe("memory index", () => {
         },
         list: [{ id: "main", default: true }],
       },
-    };
+    } satisfies OpenClawConfig;
     const result = await getMemorySearchManager({ cfg, agentId: "main" });
     expect(result.manager).not.toBeNull();
     if (!result.manager) {
       throw new Error("manager missing");
     }
-    manager = result.manager;
+    const mgr = result.manager as MemoryIndexManager;
+    manager = mgr;
 
-    await manager.sync({ force: true });
-    const before = manager.status();
+    await mgr.sync({ force: true });
+    const before = mgr.status();
     expect(before.files).toBeGreaterThan(0);
 
     failEmbeddings = true;
-    await expect(manager.sync({ force: true })).rejects.toThrow(/mock embeddings failed/i);
+    await expect(mgr.sync({ force: true })).rejects.toThrow(/mock embeddings failed/i);
 
-    const after = manager.status();
+    const after = mgr.status();
     expect(after.files).toBe(before.files);
     expect(after.chunks).toBe(before.chunks);
 
@@ -250,21 +265,61 @@ describe("memory index", () => {
         },
         list: [{ id: "main", default: true }],
       },
-    };
+    } satisfies OpenClawConfig;
     const result = await getMemorySearchManager({ cfg, agentId: "main" });
     expect(result.manager).not.toBeNull();
     if (!result.manager) {
       throw new Error("manager missing");
     }
-    manager = result.manager;
+    const mgr = result.manager as MemoryIndexManager;
+    manager = mgr;
 
-    const status = manager.status();
+    const status = mgr.status();
     if (!status.fts?.available) {
       return;
     }
 
-    await manager.sync({ force: true });
-    const results = await manager.search("zebra");
+    await mgr.sync({ force: true });
+    const results = await mgr.search("zebra");
+    expect(results.length).toBeGreaterThan(0);
+    expect(results[0]?.path).toContain("memory/2026-01-12.md");
+  });
+
+  it("falls back to keyword search when query embeddings fail", async () => {
+    const cfg = {
+      agents: {
+        defaults: {
+          workspace: workspaceDir,
+          memorySearch: {
+            provider: "openai",
+            model: "mock-embed",
+            store: { path: indexPath, vector: { enabled: false } },
+            sync: { watch: false, onSessionStart: false, onSearch: false },
+            query: {
+              minScore: 0,
+              hybrid: { enabled: true, vectorWeight: 0.5, textWeight: 0.5 },
+            },
+          },
+        },
+        list: [{ id: "main", default: true }],
+      },
+    } satisfies OpenClawConfig;
+    const result = await getMemorySearchManager({ cfg, agentId: "main" });
+    expect(result.manager).not.toBeNull();
+    if (!result.manager) {
+      throw new Error("manager missing");
+    }
+    const mgr = result.manager as MemoryIndexManager;
+    manager = mgr;
+
+    const status = mgr.status();
+    if (!status.fts?.available) {
+      return;
+    }
+
+    await mgr.sync({ force: true });
+    failQueryEmbeddings = true;
+    const results = await mgr.search("zebra");
     expect(results.length).toBeGreaterThan(0);
     expect(results[0]?.path).toContain("memory/2026-01-12.md");
   });
@@ -303,21 +358,22 @@ describe("memory index", () => {
         },
         list: [{ id: "main", default: true }],
       },
-    };
+    } satisfies OpenClawConfig;
     const result = await getMemorySearchManager({ cfg, agentId: "main" });
     expect(result.manager).not.toBeNull();
     if (!result.manager) {
       throw new Error("manager missing");
     }
-    manager = result.manager;
+    const mgr = result.manager as MemoryIndexManager;
+    manager = mgr;
 
-    const status = manager.status();
+    const status = mgr.status();
     if (!status.fts?.available) {
       return;
     }
 
-    await manager.sync({ force: true });
-    const results = await manager.search("alpha beta id123");
+    await mgr.sync({ force: true });
+    const results = await mgr.search("alpha beta id123");
     expect(results.length).toBeGreaterThan(0);
     const paths = results.map((r) => r.path);
     expect(paths).toContain("memory/vector-only.md");
@@ -361,21 +417,22 @@ describe("memory index", () => {
         },
         list: [{ id: "main", default: true }],
       },
-    };
+    } satisfies OpenClawConfig;
     const result = await getMemorySearchManager({ cfg, agentId: "main" });
     expect(result.manager).not.toBeNull();
     if (!result.manager) {
       throw new Error("manager missing");
     }
-    manager = result.manager;
+    const mgr = result.manager as MemoryIndexManager;
+    manager = mgr;
 
-    const status = manager.status();
+    const status = mgr.status();
     if (!status.fts?.available) {
       return;
     }
 
-    await manager.sync({ force: true });
-    const results = await manager.search("alpha beta id123");
+    await mgr.sync({ force: true });
+    const results = await mgr.search("alpha beta id123");
     expect(results.length).toBeGreaterThan(0);
     const paths = results.map((r) => r.path);
     expect(paths).toContain("memory/vector-only.md");
@@ -399,15 +456,16 @@ describe("memory index", () => {
         },
         list: [{ id: "main", default: true }],
       },
-    };
+    } satisfies OpenClawConfig;
     const result = await getMemorySearchManager({ cfg, agentId: "main" });
     expect(result.manager).not.toBeNull();
     if (!result.manager) {
       throw new Error("manager missing");
     }
-    manager = result.manager;
-    const available = await result.manager.probeVectorAvailability();
-    const status = result.manager.status();
+    const mgr = result.manager as MemoryIndexManager;
+    manager = mgr;
+    const available = await mgr.probeVectorAvailability();
+    const status = mgr.status();
     expect(status.vector?.enabled).toBe(true);
     expect(typeof status.vector?.available).toBe("boolean");
     expect(status.vector?.available).toBe(available);
@@ -427,14 +485,15 @@ describe("memory index", () => {
         },
         list: [{ id: "main", default: true }],
       },
-    };
+    } satisfies OpenClawConfig;
     const result = await getMemorySearchManager({ cfg, agentId: "main" });
     expect(result.manager).not.toBeNull();
     if (!result.manager) {
       throw new Error("manager missing");
     }
-    manager = result.manager;
-    await expect(result.manager.readFile({ relPath: "NOTES.md" })).rejects.toThrow("path required");
+    const mgr = result.manager as MemoryIndexManager;
+    manager = mgr;
+    await expect(mgr.readFile({ relPath: "NOTES.md" })).rejects.toThrow("path required");
   });
 
   it("allows reading from additional memory paths and blocks symlinks", async () => {
@@ -456,14 +515,15 @@ describe("memory index", () => {
         },
         list: [{ id: "main", default: true }],
       },
-    };
+    } satisfies OpenClawConfig;
     const result = await getMemorySearchManager({ cfg, agentId: "main" });
     expect(result.manager).not.toBeNull();
     if (!result.manager) {
       throw new Error("manager missing");
     }
-    manager = result.manager;
-    await expect(result.manager.readFile({ relPath: "extra/extra.md" })).resolves.toEqual({
+    const mgr = result.manager as MemoryIndexManager;
+    manager = mgr;
+    await expect(mgr.readFile({ relPath: "extra/extra.md" })).resolves.toEqual({
       path: "extra/extra.md",
       text: "Extra content.",
     });
@@ -481,9 +541,7 @@ describe("memory index", () => {
       }
     }
     if (symlinkOk) {
-      await expect(result.manager.readFile({ relPath: "extra/linked.md" })).rejects.toThrow(
-        "path required",
-      );
+      await expect(mgr.readFile({ relPath: "extra/linked.md" })).rejects.toThrow("path required");
     }
   });
 });

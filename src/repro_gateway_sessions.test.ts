@@ -1,4 +1,5 @@
-import { describe, it, expect } from "bun:test";
+import { describe, it, expect } from "vitest";
+import type { SessionEntry } from "./config/sessions.js";
 import { loadConfig } from "./config/config.js";
 import { listSessionsFromStore } from "./gateway/session-utils.js";
 
@@ -6,7 +7,7 @@ describe("listSessionsFromStore", () => {
   it("should include archived sessions when listing for an agent", () => {
     const cfg = loadConfig();
     const agentId = "main";
-    const store = {
+    const store: Record<string, SessionEntry> = {
       "agent:main:main": {
         sessionId: "current-id",
         updatedAt: Date.now(),
@@ -29,9 +30,9 @@ describe("listSessionsFromStore", () => {
     const result = listSessionsFromStore({
       cfg,
       storePath: "dummy.json",
-      store: store as any,
+      store,
       opts: {
-        agentId: "main",
+        agentId,
       },
     });
 

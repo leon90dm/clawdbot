@@ -121,25 +121,63 @@ export async function createOllamaEmbeddingProvider(
 
   let preferredApi: "openai" | "openai-single" | "ollama-embed" | "ollama-embeddings" = "openai";
 
-  const request = async (url: string, body: unknown): Promise<Response> => {
-    try {
-      return await fetch(url, {
-        method: "POST",
-        headers: client.headers,
-        body: JSON.stringify(body),
-      });
-    } catch (err) {
-      const code =
-        extractErrorCode(err) ?? extractErrorCode((err as { cause?: unknown } | null)?.cause);
-      const prefix = code ? `${code}: ` : "";
-      const message = formatErrorMessage(err);
-      throw Object.assign(
-        new Error(`ollama embeddings request failed: ${url}: ${prefix}${message}`),
-        {
-          cause: err,
-        },
-      );
+  const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+  const shouldRetryBody = (text: string): boolean => {
+    if (!text) {
+      return true;
     }
+    return /EOF|EPIPE|ECONNRESET|ECONNREFUSED|connection refused|connection reset|broken pipe|dial tcp|timeout|timed out|socket hang up/i.test(
+      text,
+    );
+  };
+
+  const request = async (url: string, body: unknown): Promise<Response> => {
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const res = (await fetch(url, {
+          method: "POST",
+          headers: client.headers,
+          body: JSON.stringify(body),
+        })) as Response;
+
+        if (res.ok) {
+          return res;
+        }
+
+        const cloneFn = (res as unknown as { clone?: () => Response }).clone;
+        const text = cloneFn
+          ? await cloneFn.call(res).text()
+          : typeof (res as unknown as { text?: () => Promise<string> }).text === "function"
+            ? await (res as unknown as { text: () => Promise<string> }).text()
+            : "";
+        const retryable = res.status >= 500 && shouldRetryBody(text);
+        if (!retryable || attempt === maxAttempts) {
+          if (cloneFn) {
+            return res;
+          }
+          return new Response(text, { status: res.status });
+        }
+        await sleep(150 * 2 ** (attempt - 1));
+      } catch (err) {
+        const message = formatErrorMessage(err);
+        const retryable = shouldRetryBody(message);
+        if (!retryable || attempt === maxAttempts) {
+          const code =
+            extractErrorCode(err) ?? extractErrorCode((err as { cause?: unknown } | null)?.cause);
+          const prefix = code ? `${code}: ` : "";
+          throw Object.assign(
+            new Error(`ollama embeddings request failed: ${url}: ${prefix}${message}`),
+            {
+              cause: err,
+            },
+          );
+        }
+        await sleep(150 * 2 ** (attempt - 1));
+      }
+    }
+    throw new Error(`ollama embeddings request failed: ${url}: retry exhausted`);
   };
 
   const parseEmbeddingResponse = async (res: Response, url: string): Promise<number[][]> => {
