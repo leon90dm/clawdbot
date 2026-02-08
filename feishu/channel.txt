@@ -1,0 +1,21 @@
+channels:
+  feishu:
+    enabled: true
+    appId: "cli_a8147e603efdd00b"
+    appSecret: "secret"
+    # 域名: "feishu" (国内)、"lark" (国际) 或自定义 URL
+    domain: "feishu"  # 私有化部署可用 "https://open.xxx.cn"
+    # 连接模式: "websocket" (推荐) 或 "webhook"
+    connectionMode: "websocket"
+    # Webhook 路径 (默认: "/feishu/events")
+    webhookPath: "/feishu/events"
+    # 私聊策略: "pairing" | "open" | "allowlist"
+    dmPolicy: "pairing"
+    # 群聊策略: "open" | "allowlist" | "disabled"
+    groupPolicy: "allowlist"
+    # 群聊是否需要 @机器人
+    requireMention: true
+    # 媒体文件最大大小 (MB, 默认 30)
+    mediaMaxMb: 30
+    # 回复渲染模式: "auto" | "raw" | "card"
+    renderMode: "auto"

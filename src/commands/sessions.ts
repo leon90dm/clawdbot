@@ -9,7 +9,7 @@ import { isRich, theme } from "../terminal/theme.js";
 
 type SessionRow = {
   key: string;
-  kind: "direct" | "group" | "global" | "unknown";
+  kind: "direct" | "group" | "global" | "unknown" | "archive";
   updatedAt: number | null;
   ageMs: number | null;
   sessionId?: string;
@@ -28,7 +28,7 @@ type SessionRow = {
   contextTokens?: number;
 };
 
-const KIND_PAD = 6;
+const KIND_PAD = 8;
 const KEY_PAD = 26;
 const AGE_PAD = 9;
 const MODEL_PAD = 14;
@@ -86,6 +86,9 @@ const formatKindCell = (kind: SessionRow["kind"], rich: boolean) => {
   if (kind === "direct") {
     return theme.accent(label);
   }
+  if (kind === "archive") {
+    return theme.muted(label);
+  }
   return theme.muted(label);
 };
 
@@ -141,6 +144,9 @@ function classifyKey(key: string, entry?: SessionEntry): SessionRow["kind"] {
   }
   if (key === "unknown") {
     return "unknown";
+  }
+  if (key.startsWith("archive:")) {
+    return "archive";
   }
   if (entry?.chatType === "group" || entry?.chatType === "channel") {
     return "group";
