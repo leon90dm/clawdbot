@@ -4,6 +4,12 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const { logWarnMock, logDebugMock, logInfoMock } = vi.hoisted(() => ({
+  logWarnMock: vi.fn(),
+  logDebugMock: vi.fn(),
+  logInfoMock: vi.fn(),
+}));
+
 type MockChild = EventEmitter & {
   stdout: EventEmitter;
   stderr: EventEmitter;
@@ -25,12 +31,30 @@ function createMockChild(params?: { autoClose?: boolean; closeDelayMs?: number }
   };
   if (params?.autoClose !== false) {
     const delayMs = params?.closeDelayMs ?? 0;
-    setTimeout(() => {
-      child.emit("close", 0);
-    }, delayMs);
+    if (delayMs <= 0) {
+      queueMicrotask(() => {
+        child.emit("close", 0);
+      });
+    } else {
+      setTimeout(() => {
+        child.emit("close", 0);
+      }, delayMs);
+    }
   }
   return child;
 }
+
+vi.mock("../logging/subsystem.js", () => ({
+  createSubsystemLogger: () => {
+    const logger = {
+      warn: logWarnMock,
+      debug: logDebugMock,
+      info: logInfoMock,
+      child: () => logger,
+    };
+    return logger;
+  },
+}));
 
 vi.mock("node:child_process", () => ({ spawn: vi.fn() }));
 
@@ -51,6 +75,9 @@ describe("QmdMemoryManager", () => {
   beforeEach(async () => {
     spawnMock.mockReset();
     spawnMock.mockImplementation(() => createMockChild());
+    logWarnMock.mockReset();
+    logDebugMock.mockReset();
+    logInfoMock.mockReset();
     tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), "qmd-manager-test-"));
     workspaceDir = path.join(tmpRoot, "workspace");
     await fs.mkdir(workspaceDir, { recursive: true });
@@ -73,6 +100,7 @@ describe("QmdMemoryManager", () => {
   });
 
   afterEach(async () => {
+    vi.useRealTimers();
     delete process.env.OPENCLAW_STATE_DIR;
     await fs.rm(tmpRoot, { recursive: true, force: true });
   });
@@ -218,6 +246,7 @@ describe("QmdMemoryManager", () => {
   });
 
   it("times out qmd update during sync when configured", async () => {
+    vi.useFakeTimers();
     cfg = {
       ...cfg,
       memory: {
@@ -242,14 +271,17 @@ describe("QmdMemoryManager", () => {
     });
 
     const resolved = resolveMemoryBackendConfig({ cfg, agentId });
-    const manager = await QmdMemoryManager.create({ cfg, agentId, resolved });
+    const createPromise = QmdMemoryManager.create({ cfg, agentId, resolved });
+    await vi.advanceTimersByTimeAsync(0);
+    const manager = await createPromise;
     expect(manager).toBeTruthy();
     if (!manager) {
       throw new Error("manager missing");
     }
-    await expect(manager.sync({ reason: "manual" })).rejects.toThrow(
-      "qmd update timed out after 20ms",
-    );
+    const syncPromise = manager.sync({ reason: "manual" });
+    const rejected = expect(syncPromise).rejects.toThrow("qmd update timed out after 20ms");
+    await vi.advanceTimersByTimeAsync(20);
+    await rejected;
     await manager.close();
   });
 
@@ -378,6 +410,7 @@ describe("QmdMemoryManager", () => {
   });
 
   it("logs and continues when qmd embed times out", async () => {
+    vi.useFakeTimers();
     cfg = {
       ...cfg,
       memory: {
@@ -402,12 +435,17 @@ describe("QmdMemoryManager", () => {
     });
 
     const resolved = resolveMemoryBackendConfig({ cfg, agentId });
-    const manager = await QmdMemoryManager.create({ cfg, agentId, resolved });
+    const createPromise = QmdMemoryManager.create({ cfg, agentId, resolved });
+    await vi.advanceTimersByTimeAsync(0);
+    const manager = await createPromise;
     expect(manager).toBeTruthy();
     if (!manager) {
       throw new Error("manager missing");
     }
-    await expect(manager.sync({ reason: "manual" })).resolves.toBeUndefined();
+    const syncPromise = manager.sync({ reason: "manual" });
+    const resolvedSync = expect(syncPromise).resolves.toBeUndefined();
+    await vi.advanceTimersByTimeAsync(20);
+    await resolvedSync;
     await manager.close();
   });
 
@@ -438,6 +476,42 @@ describe("QmdMemoryManager", () => {
       (manager as unknown as { isScopeAllowed: (key?: string) => boolean }).isScopeAllowed(key);
     expect(isAllowed("agent:main:slack:channel:c123")).toBe(true);
     expect(isAllowed("agent:main:discord:channel:c123")).toBe(false);
+
+    await manager.close();
+  });
+
+  it("logs when qmd scope denies search", async () => {
+    cfg = {
+      ...cfg,
+      memory: {
+        backend: "qmd",
+        qmd: {
+          includeDefaultMemory: false,
+          update: { interval: "0s", debounceMs: 60_000, onBoot: false },
+          paths: [{ path: workspaceDir, pattern: "**/*.md", name: "workspace" }],
+          scope: {
+            default: "deny",
+            rules: [{ action: "allow", match: { chatType: "direct" } }],
+          },
+        },
+      },
+    } as OpenClawConfig;
+    const resolved = resolveMemoryBackendConfig({ cfg, agentId });
+    const manager = await QmdMemoryManager.create({ cfg, agentId, resolved });
+    expect(manager).toBeTruthy();
+    if (!manager) {
+      throw new Error("manager missing");
+    }
+
+    logWarnMock.mockClear();
+    const beforeCalls = spawnMock.mock.calls.length;
+    await expect(
+      manager.search("blocked", { sessionKey: "agent:main:discord:channel:c123" }),
+    ).resolves.toEqual([]);
+
+    expect(spawnMock.mock.calls.length).toBe(beforeCalls);
+    expect(logWarnMock).toHaveBeenCalledWith(expect.stringContaining("qmd search denied by scope"));
+    expect(logWarnMock).toHaveBeenCalledWith(expect.stringContaining("chatType=channel"));
 
     await manager.close();
   });
