@@ -1,3 +1,7 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 if [[ -f "$ROOT/.env" ]]; then
   set -a
@@ -19,4 +23,4 @@ if [[ -z "${BYTEDANCE_API_KEY:-}" && -n "${OPENAI_API_KEY:-}" ]]; then
   export BYTEDANCE_API_KEY="$OPENAI_API_KEY"
 fi
 
-OPENCLAW_STATE_DIR="$STATE_DIR" OPENCLAW_USE_SYSTEM_CONFIG=1 OPENCLAW_CONFIG_PATH="$CONFIG_PATH" exec ./bin/cli.sh gateway --force --token "$TOKEN" "$@"
+OPENCLAW_STATE_DIR="$STATE_DIR" OPENCLAW_USE_SYSTEM_CONFIG=1 OPENCLAW_CONFIG_PATH="$CONFIG_PATH" exec ./bin/cli.sh gateway --force --allow-unconfigured --token "$TOKEN" "$@"

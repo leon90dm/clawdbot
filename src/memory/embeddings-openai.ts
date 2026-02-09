@@ -136,11 +136,11 @@ export async function createOllamaEmbeddingProvider(
     const maxAttempts = 3;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        const res = (await fetch(url, {
+        const res = await fetch(url, {
           method: "POST",
           headers: client.headers,
           body: JSON.stringify(body),
-        })) as Response;
+        });
 
         if (res.ok) {
           return res;
