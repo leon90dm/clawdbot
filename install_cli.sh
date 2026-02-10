@@ -21,6 +21,7 @@ pnpm install
 
 echo "Building project..."
 pnpm build
+pnpm ui:build
 
 echo "Installing CLI globally..."
 # Try to install globally without sudo first (for nvm/fnm users)
@@ -40,3 +41,7 @@ if command -v openclaw &> /dev/null; then
 else
     echo "Warning: openclaw command not found in PATH. You might need to restart your shell or add the global bin directory to your PATH."
 fi
+
+echo ""
+echo "Note: If you are running the gateway, remember to restart it to apply changes:"
+echo "  openclaw gateway restart"
