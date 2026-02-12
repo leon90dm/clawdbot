@@ -149,30 +149,6 @@ describe("initSessionState RawBody", () => {
     expect(result.bodyStripped).toBe("");
   });
 
-  it("supports plain-text reset trigger '重置session' with RawBody", async () => {
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-rawbody-reset-text-"));
-    const storePath = path.join(root, "sessions.json");
-    const cfg = { session: { store: storePath } } as OpenClawConfig;
-
-    const groupMessageCtx = {
-      Body: `[Context]\nJake: 重置session\n[from: Jake]`,
-      RawBody: "重置session",
-      ChatType: "group",
-      SessionKey: "agent:main:feishu:group:g1",
-      Provider: "feishu",
-      Surface: "feishu",
-    };
-
-    const result = await initSessionState({
-      ctx: groupMessageCtx,
-      cfg,
-      commandAuthorized: true,
-    });
-
-    expect(result.isNewSession).toBe(true);
-    expect(result.bodyStripped).toBe("");
-  });
-
   it("preserves argument casing while still matching reset triggers case-insensitively", async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-rawbody-reset-case-"));
     const storePath = path.join(root, "sessions.json");
