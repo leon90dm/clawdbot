@@ -6,6 +6,7 @@ import type { OpenClawConfig } from "../../config/config.js";
 import type { TtsAutoMode } from "../../config/types.tts.js";
 import type { MsgContext, TemplateContext } from "../templating.js";
 import { resolveSessionAgentId } from "../../agents/agent-scope.js";
+import { abortEmbeddedPiRun } from "../../agents/pi-embedded.js";
 import { normalizeChatType } from "../../channels/chat-type.js";
 import {
   DEFAULT_RESET_TRIGGERS,
@@ -32,6 +33,7 @@ import { normalizeSessionDeliveryFields } from "../../utils/delivery-context.js"
 import { resolveCommandAuthorization } from "../command-auth.js";
 import { normalizeInboundTextNewlines } from "./inbound-text.js";
 import { stripMentions, stripStructuralPrefixes } from "./mentions.js";
+import { clearSessionQueues } from "./queue.js";
 
 export type SessionInitResult = {
   sessionCtx: TemplateContext;
@@ -196,6 +198,12 @@ export async function initSessionState(params: {
   sessionKey = resolveSessionKey(sessionScope, sessionCtxForState, mainKey);
   const entry = sessionStore[sessionKey];
   const previousSessionEntry = resetTriggered && entry ? { ...entry } : undefined;
+  if (resetTriggered && previousSessionEntry) {
+    // Reset must drop in-flight work tied to the old session key/id, otherwise
+    // queued followups can continue sending stale, oversized contexts upstream.
+    abortEmbeddedPiRun(previousSessionEntry.sessionId);
+    clearSessionQueues([sessionKey, previousSessionEntry.sessionId]);
+  }
   const now = Date.now();
   const isThread = resolveThreadFlag({
     sessionKey,

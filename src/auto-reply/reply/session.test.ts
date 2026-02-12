@@ -4,6 +4,7 @@ import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import type { OpenClawConfig } from "../../config/config.js";
 import { saveSessionStore } from "../../config/sessions.js";
+import { enqueueFollowupRun, getFollowupQueueDepth } from "./queue.js";
 import { initSessionState } from "./session.js";
 
 describe("initSessionState thread forking", () => {
@@ -171,6 +172,60 @@ describe("initSessionState RawBody", () => {
 
     expect(result.isNewSession).toBe(true);
     expect(result.bodyStripped).toBe("");
+  });
+
+  it("clears queued followups when reset is triggered via text command", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-rawbody-reset-cleanup-"));
+    const storePath = path.join(root, "sessions.json");
+    const sessionKey = "agent:main:feishu:dm:reset-cleanup";
+    const previousSessionId = "previous-session-id";
+    const cfg = { session: { store: storePath } } as OpenClawConfig;
+
+    await saveSessionStore(storePath, {
+      [sessionKey]: {
+        sessionId: previousSessionId,
+        updatedAt: Date.now(),
+      },
+    });
+
+    enqueueFollowupRun(
+      sessionKey,
+      {
+        prompt: "queued before reset",
+        enqueuedAt: Date.now(),
+        run: {
+          agentId: "main",
+          agentDir: process.cwd(),
+          sessionId: previousSessionId,
+          sessionKey,
+          sessionFile: path.join(root, "dummy.jsonl"),
+          workspaceDir: root,
+          config: cfg,
+          provider: "openai",
+          model: "gpt-5.2",
+          timeoutMs: 30_000,
+          blockReplyBreak: "message_end",
+        },
+      },
+      { mode: "followup" },
+    );
+    expect(getFollowupQueueDepth(sessionKey)).toBe(1);
+
+    const result = await initSessionState({
+      ctx: {
+        Body: "重置session",
+        RawBody: "重置session",
+        SessionKey: sessionKey,
+        Provider: "feishu",
+        Surface: "feishu",
+      },
+      cfg,
+      commandAuthorized: true,
+    });
+
+    expect(result.isNewSession).toBe(true);
+    expect(result.sessionId).not.toBe(previousSessionId);
+    expect(getFollowupQueueDepth(sessionKey)).toBe(0);
   });
 
   it("preserves argument casing while still matching reset triggers case-insensitively", async () => {
