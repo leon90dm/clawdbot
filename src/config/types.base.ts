@@ -123,6 +123,12 @@ export type LoggingConfig = {
   file?: string;
   consoleLevel?: "silent" | "fatal" | "error" | "warn" | "info" | "debug" | "trace";
   consoleStyle?: "pretty" | "compact" | "json";
+  /** Log every LLM request/response to `<workspace>/cache/llm-calls.jsonl`. Default: off. */
+  llmCalls?: {
+    enabled?: boolean;
+    /** Log mode: summary = compact cost diagnostics; full = include raw request/payload/response bodies. */
+    mode?: "summary" | "full";
+  };
   /** Redact sensitive tokens in tool summaries. Default: "tools". */
   redactSensitive?: "off" | "tools";
   /** Regex patterns used to redact sensitive tokens (defaults apply when unset). */

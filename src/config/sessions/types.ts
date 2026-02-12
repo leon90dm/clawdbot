@@ -164,5 +164,5 @@ export type SessionSystemPromptReport = {
 };
 
 export const DEFAULT_RESET_TRIGGER = "/new";
-export const DEFAULT_RESET_TRIGGERS = ["/new", "/reset"];
+export const DEFAULT_RESET_TRIGGERS = ["/new", "/reset", "重置session"];
 export const DEFAULT_IDLE_MINUTES = 60;

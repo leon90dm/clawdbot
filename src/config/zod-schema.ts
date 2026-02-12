@@ -184,6 +184,13 @@ export const OpenClawSchema = z
         consoleStyle: z
           .union([z.literal("pretty"), z.literal("compact"), z.literal("json")])
           .optional(),
+        llmCalls: z
+          .object({
+            enabled: z.boolean().optional(),
+            mode: z.union([z.literal("summary"), z.literal("full")]).optional(),
+          })
+          .strict()
+          .optional(),
         redactSensitive: z.union([z.literal("off"), z.literal("tools")]).optional(),
         redactPatterns: z.array(z.string()).optional(),
       })
